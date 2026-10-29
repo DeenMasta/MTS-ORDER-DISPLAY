@@ -1,211 +1,187 @@
 # Kitchen Display POS Integration
 
-This document describes the Kitchen Display System (KDS) integration completed
-in the POS application. It is intended as a practical handoff for the KDS app
-team and for future POS maintenance.
-
-## Status
-
-Completed in POS:
-
-- Kitchen Display Settings entry and display management UI.
-- Backend-backed display listing, editing, enable/disable, test, and unpair.
-- Temporary POS LAN pairing server.
-- Authenticated backend pairing start and confirmation.
-- One-time KDS credential handoff over the local pairing server.
-- Outlet realtime subscription for Kitchen Display diagnostics.
-
-Postponed:
-
-- Real POS-to-KDS device testing on the same Wi-Fi network. This requires the
-  KDS Android app to be available.
+This is the POS implementation of `KITCHEN_DISPLAY_API.md`. KDS traffic stays
+on the outlet LAN; Laravel Cloud is only used for display configuration and
+operator-approved pairing.
 
 ## Architecture
 
 ```text
-POS Settings UI
-    |
-    +-- KitchenDisplayRepository -- HTTPS --> Kitchen Display API
-    |                                      |
-    |                                      +-- pairing, display configuration,
-    |                                          tickets, and realtime broadcasts
-    |
-    +-- KdsPairingServer -- outlet LAN --> KDS Android app
-    |                                      |
-    |                                      +-- receives a pairing challenge
-    |                                      +-- polls once for confirmation
-    |
-    +-- Reverb/Pusher <---- private-outlet-{outletId} ---- Backend
-           |
-           +-- refreshes POS display diagnostics only
+KDS Android app -- persistent ws://POS-IP:PORT/kds --> POS LAN listener
+                                                        |
+                                                        +-- pairing confirmation
+                                                        +-- department routing
+                                                        +-- order retry until ack
+
+POS Settings -- HTTPS --> Laravel API
+                         pairing start/confirm, list, update, delete only
+
+Existing kitchen print job --> physical printer
+                          --> structured kitchen_order to matching KDS sockets
 ```
 
-The POS does not send kitchen tickets directly to a KDS device. After pairing,
-the KDS communicates with the backend itself using its display-scoped token.
-Kitchen ticket state is independent from printer retries and `PrintReceiptCache`.
-
-## POS feature layout
-
-```text
-lib/features/kitchen_display/
-  data/
-    model/kitchen_display_model.dart
-    remote/kitchen_display_repository_impl.dart
-  domain/
-    models/kitchen_display_pairing.dart
-    repositories/kitchen_display_repository.dart
-    usecases/
-      start_kds_pairing_usecase.dart
-      confirm_kds_pairing_usecase.dart
-  presentation/
-    providers/kitchen_display_providers.dart
-    screens/kitchen_display_setup_screen.dart
-    services/
-      kds_pairing_server.dart
-      kitchen_display_realtime_handler.dart
-```
-
-The Kitchen Display feature is deliberately separate from the generic printer,
-pending-sync, and print-cache features. Configuration changes go directly to
-the Kitchen Display API.
+There are no KDS ticket, status, test, access-token, or Reverb endpoints.
 
 ## Pairing flow
 
-1. An operator opens **Settings → Kitchen Display** and selects **Pair Display**.
-2. POS starts a temporary HTTP server on the outlet LAN and displays
-   `{pos-lan-ip}:{temporary-port}`.
-3. KDS sends a challenge to POS:
+1. POS starts its local WebSocket listener during application startup. In
+   Settings, **Pair Display** shows its LAN IP and port.
+2. KDS connects to `ws://{pos-ip}:{port}/kds` and sends `pair.challenge` with
+   its stable display ID, name, nonce, code, and capabilities.
+3. POS shows the code and lets the operator select existing Department Printer
+   departments.
+4. POS sends the pairing start request to Laravel using the POS listener IP
+   and port. After Laravel confirms the code, POS sends `pair.confirmed` on
+   the same KDS socket. Its `display_id` is the Laravel kitchen-display record
+   ID, not the KDS installation UUID from `pair.challenge`.
+5. That socket remains open for kitchen orders. Updating departments or the
+   enabled switch updates the in-memory routing immediately. Disabling or
+   deleting a display closes the matching socket.
 
-   ```http
-   POST /v1/kds/pair/challenge
-   Content-Type: application/json
-   ```
+The pairing challenge expires after 10 minutes. The KDS must not accept an
+order until it receives `pair.confirmed` for its current socket.
 
-   ```json
-   {
-     "display_id": "kds-installation-id",
-     "name": "Main Kitchen",
-     "host": "192.168.1.50",
-     "port": 8080,
-     "nonce": "random-unguessable-value",
-     "code": "483921",
-     "capabilities": {
-       "api_version": 1,
-       "realtime": true
-     }
-   }
-   ```
+## KDS app integration
 
-4. POS validates the challenge and shows the KDS name, address, and short code.
-5. The operator verifies that the code matches the KDS screen, chooses the
-   departments, and selects **Confirm Pairing**.
-6. POS calls the backend with normal POS authentication and the active
-   `pos-device-id` header:
+### Connection state
 
-   ```text
-   POST /api/v2/kitchen-displays/pair/start
-   POST /api/v2/kitchen-displays/{displayId}/pair/confirm
-   ```
-
-7. POS keeps the backend confirmation only in memory and exposes it one time
-   to the same KDS pairing attempt:
-
-   ```http
-   GET /v1/kds/pair/result?nonce={nonce}
-   ```
-
-8. The result has `state: "confirmed"` and includes the display credential and
-   backend connection values. POS immediately clears this data and stops the
-   temporary pairing server after sending the response.
-
-9. KDS stores the credential in Android secure storage and begins its own
-   backend ticket sync and Reverb subscription.
-
-## KDS app requirements
-
-The KDS app should:
-
-- Generate a new random nonce and short code for every pairing attempt.
-- Call the POS challenge endpoint using the operator-provided POS LAN address.
-- Poll the result endpoint with the same nonce until it is confirmed, rejected,
-  or expired.
-- Verify `state == "confirmed"` before reading the credential.
-- Store `access_token` in Android Keystore-backed encrypted storage only.
-- Use the returned backend settings (`api_base_url`, `broadcast_auth_url`,
-  `channel_name`, and `echo_channel`) for backend communication.
-- Delete the stored credential and return to pairing after a backend `401`, or
-  a `403` indicating that the display token is inactive.
-
-The KDS must not send tickets to POS over the LAN pairing connection. The LAN
-connection is only for the short-lived pairing exchange.
-
-## KDS ticket delivery
-
-After pairing, KDS uses the display token for:
+Implement the KDS connection as this small state machine:
 
 ```text
-GET   /api/v2/kitchen-tickets
-PATCH /api/v2/kitchen-tickets/{ticketId}/status
-POST  /api/v2/kitchen-tickets/{ticketId}/ack
+disconnected -> connecting -> waitingForPairConfirmation -> paired
+      ^                                                |
+      +---------------- reconnect on socket close -----+
 ```
 
-KDS subscribes to the private channel returned during pairing, normally:
+On every new socket, create a fresh random `nonce` and 4–32 character `code`,
+show the code to the operator, and send `pair.challenge`. The KDS can reconnect
+automatically, but a new connection must complete the documented nonce/code
+pairing before it is trusted. There is intentionally no KDS bearer token or
+cloud ticket endpoint.
+
+Persist these values on the KDS device:
+
+| Value | Why |
+| --- | --- |
+| Installation UUID | Sent as `pair.challenge.display_id`; stable for the app installation. |
+| Laravel display ID | Received in `pair.confirmed`; useful for local diagnostics. |
+| Order cards and their latest revision | Restores the kitchen screen after an app restart. |
+| Processed `message_id` values | Makes a POS retry safe. |
+| Local dismissal state | Dismissal stays on the KDS and is never sent upstream. |
+
+The installation UUID and Laravel display ID are different values. Do not
+replace the installation UUID with the ID in `pair.confirmed`.
+
+### Pairing messages
+
+Send this immediately after the socket opens:
+
+```json
+{
+  "type": "pair.challenge",
+  "display_id": "stable-kds-installation-uuid",
+  "name": "Main Kitchen",
+  "nonce": "new-random-value-for-this-attempt",
+  "code": "483921",
+  "capabilities": {
+    "app_version": "1.0.0",
+    "protocol": "kitchen-order.v1"
+  }
+}
+```
+
+Wait for this response on the same socket:
+
+```json
+{
+  "type": "pair.confirmed",
+  "display_id": "kitchen-display-id",
+  "protocol": "kitchen-order.v1"
+}
+```
+
+Validate `protocol == "kitchen-order.v1"`, persist `display_id`, then change
+the local connection state to `paired`. A closed socket, malformed message, or
+unexpected protocol returns the app to `disconnected`; do not treat it as a
+paired session.
+
+## Order delivery
+
+The existing kitchen/void print job remains the source of truth for grouping:
+its `DepartmentPrinter` already provides the department and filtered items.
+POS sends one `kitchen_order` message per job with the stable print-cache ID as
+`message_id`, an `upsert` action for kitchen jobs, or `cancel` for void jobs.
+
+Each enabled display assigned to that department receives the same structured
+message. POS queues the message for configured displays, retries every three
+seconds, and stops after a matching acknowledgement or three attempts. A KDS
+that pairs during that retry window receives the queued message. Delivery logs
+include the message, sale, department, display, attempt, send/ack timestamps,
+and a disconnection error where relevant.
+
+### Receiving and acknowledging an order
+
+Handle only `kitchen_order` messages while the socket is `paired`.
+
+1. Validate `protocol`, `message_id`, `sale_id`, `department_id`, `revision`,
+   `action`, and the items array.
+2. In one local database transaction, check `message_id` and the current card
+   revision for `(sale_id, department_id)`.
+3. A duplicate `message_id` changes nothing. An older revision changes
+   nothing. In both cases, acknowledge it again.
+4. For `action: "upsert"`, create or replace the card only when the revision is
+   newer. For `action: "cancel"`, remove that department card when the revision
+   is not older.
+5. Save the processed message ID before sending the acknowledgement. Do not
+   acknowledge an order that failed to save.
+
+Reply on the same socket:
+
+```json
+{
+  "type": "kitchen_order.received",
+  "message_id": "the-message-id-received",
+  "received_at": "2026-10-29T10:30:01+08:00"
+}
+```
+
+An acknowledgement is delivery/storage confirmation only. Never send
+`preparing`, `ready`, `served`, dismissal, or any other kitchen workflow state
+to POS or Laravel.
+
+## Code map
 
 ```text
-private-kitchen-display-{displayId}
+lib/features/kitchen_display/
+  data/remote/kitchen_display_repository_impl.dart  Laravel admin APIs
+  domain/models/kitchen_display_pairing.dart         pairing request/result
+  presentation/services/kds_pairing_server.dart      LAN WebSocket + ack retry
+  presentation/screens/kitchen_display_setup_screen.dart
+                                                     Settings pairing/admin UI
+
+lib/data/services/printer_job_service.dart           existing printer job hook
 ```
 
-Treat these Reverb events as wake-up signals, not complete ticket records:
+## Verification
 
-- `kitchen-ticket.created`
-- `kitchen-ticket.updated`
-- `kitchen-ticket.cancelled`
-- `kitchen-display.test`
-
-On a ticket event, KDS should fetch the authoritative cursor feed from
-`GET /api/v2/kitchen-tickets` and apply it locally before saving the returned
-cursor. It should also perform a repair poll every 30–60 seconds.
-
-## POS outlet realtime behavior
-
-POS retains its existing shift subscription and additionally subscribes to:
+Focused Flutter tests cover backend-ID pairing, acknowledgement ownership,
+retry cancellation, and delivery queued before pairing:
 
 ```text
-private-outlet-{outletId}
+flutter test test/features/kitchen_display
 ```
 
-For the four Kitchen Display event names above, POS refreshes Kitchen Display
-list/diagnostic state only. It does not create tickets, alter ticket state, or
-touch printer retry data.
+## Operational notes
 
-## Security and lifecycle rules
-
-- POS sends its normal bearer token and `pos-device-id` header for both pairing
-  backend requests.
-- POS never persists or logs a KDS access token, nonce, code, or pairing
-  payload.
-- The local POS pairing server accepts only the documented challenge and result
-  routes, keeps state in memory, limits payload size, and expires attempts
-  after ten minutes.
-- The confirmation payload can be retrieved once. It is then discarded and the
-  local server closes.
-- Cancelling pairing, leaving the POS settings page, expiry, or a failed local
-  session clears all in-memory pairing state.
-
-## Device-test checklist (pending KDS app)
-
-1. Put POS and KDS on the same Wi-Fi network.
-2. Start POS pairing and enter its displayed IP address and port in KDS.
-3. Confirm the KDS name, host/port, and code shown in POS match KDS.
-4. Select departments and confirm pairing in POS.
-5. Confirm KDS receives the one-time response and can load its first ticket
-   snapshot.
-6. Create, update, and cancel an order; confirm KDS cursor sync responds to
-   realtime wake-up events.
-7. Use **Send Test** in POS and confirm the KDS visibly renders the test.
-8. Unpair in POS and verify KDS can no longer use its credential.
-
-## Related documents
-
-- `docs/KITCHEN_DISPLAY_API.md` — backend and KDS API contract.
-- `docs/KITCHEN_DISPLAY_POS_INTEGRATION_PLAN.md` — original POS delivery plan.
+- POS and KDS must be on the same Wi-Fi/LAN and the POS listener port must be
+  reachable from the KDS device.
+- POS must stay running to accept connections and deliver orders.
+- KDS should reconnect with exponential backoff, then generate a new pairing
+  nonce/code for that socket. Do not reuse a stale pairing confirmation.
+- KDS should deduplicate by `message_id`; POS can resend an unacknowledged
+  order during its three-attempt retry window.
+- Laravel migrations and the updated five administration endpoints must be
+  deployed separately before pairing is tested.
+- The KDS Android source is not part of this repository. It needs only a local
+  WebSocket client and local card/message storage; it must never call Laravel
+  or store POS credentials.
