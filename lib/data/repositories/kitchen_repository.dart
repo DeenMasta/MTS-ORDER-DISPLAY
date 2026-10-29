@@ -15,6 +15,8 @@ abstract interface class KitchenRepository {
 
   Future<List<KitchenTicket>> dismiss(String ticketId);
   Future<List<KitchenTicket>> start(DisplaySession session);
+  Future<List<KdsOrderType>> orderTypes();
+  Future<void> updateOrderTypeIcon(String id, String icon);
 }
 
 class StoredKitchenRepository implements KitchenRepository {
@@ -50,7 +52,9 @@ class StoredKitchenRepository implements KitchenRepository {
     _orders ??= _connection.messages
         .where((message) => message['type'] == 'kitchen_order')
         .listen((message) => unawaited(_receive(message)));
-    _pairingStates ??= _pairingRepository.states.listen((_) => _changes.add(null));
+    _pairingStates ??= _pairingRepository.states.listen(
+      (_) => _changes.add(null),
+    );
     await _pairingRepository.resume(
       session: session,
       installationId: await _deviceIdentityRepository.getOrCreate(),
@@ -66,8 +70,16 @@ class StoredKitchenRepository implements KitchenRepository {
     return tickets;
   }
 
+  @override
+  Future<List<KdsOrderType>> orderTypes() => _store.orderTypes();
+
+  @override
+  Future<void> updateOrderTypeIcon(String id, String icon) =>
+      _store.updateOrderTypeIcon(id, icon);
+
   Future<void> _receive(Map<String, dynamic> message) async {
-    if (!_pairingRepository.isPaired || message['protocol'] != 'kitchen-order.v1') {
+    if (!_pairingRepository.isPaired ||
+        message['protocol'] != 'kitchen-order.v1') {
       return;
     }
     try {

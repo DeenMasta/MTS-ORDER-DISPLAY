@@ -5,7 +5,11 @@ import '../../../../domain/models/kitchen_ticket.dart';
 import '../view_models/kitchen_board_view_model.dart';
 
 class KitchenBoardScreen extends StatefulWidget {
-  const KitchenBoardScreen({super.key, required this.viewModel, required this.session});
+  const KitchenBoardScreen({
+    super.key,
+    required this.viewModel,
+    required this.session,
+  });
 
   final KitchenBoardViewModel viewModel;
   final DisplaySession session;
@@ -23,7 +27,16 @@ class _KitchenBoardScreenState extends State<KitchenBoardScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Kitchen display')),
+    appBar: AppBar(
+      title: const Text('Kitchen display'),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.settings),
+          tooltip: 'Order type icons',
+          onPressed: () => _showOrderTypeIcons(context, widget.viewModel),
+        ),
+      ],
+    ),
     body: ListenableBuilder(
       listenable: widget.viewModel,
       builder: (context, child) {
@@ -46,9 +59,16 @@ class _KitchenBoardScreenState extends State<KitchenBoardScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(code == null ? 'Connecting to POS…' : 'Confirm this code in POS'),
+                  Text(
+                    code == null
+                        ? 'Connecting to POS…'
+                        : 'Confirm this code in POS',
+                  ),
                   if (code != null)
-                    Text(code, style: Theme.of(context).textTheme.displayMedium),
+                    Text(
+                      code,
+                      style: Theme.of(context).textTheme.displayMedium,
+                    ),
                 ],
               ),
             ),
@@ -57,12 +77,19 @@ class _KitchenBoardScreenState extends State<KitchenBoardScreen> {
         if (widget.viewModel.tickets.isEmpty) {
           return const Center(child: Text('No active kitchen tickets.'));
         }
+        final ticketGroups = groupKitchenTicketsByOrder(
+          widget.viewModel.tickets,
+        );
         return ListView.builder(
           padding: const EdgeInsets.all(16),
-          itemCount: widget.viewModel.tickets.length,
+          itemCount: ticketGroups.length,
           itemBuilder: (context, index) => _TicketCard(
-            ticket: widget.viewModel.tickets[index],
-            onDismiss: () => widget.viewModel.dismiss(widget.viewModel.tickets[index].id),
+            tickets: ticketGroups[index],
+            onDismiss: () async {
+              for (final ticket in ticketGroups[index]) {
+                await widget.viewModel.dismiss(ticket.id);
+              }
+            },
           ),
         );
       },
@@ -70,49 +97,121 @@ class _KitchenBoardScreenState extends State<KitchenBoardScreen> {
   );
 }
 
-class _TicketCard extends StatelessWidget {
-  const _TicketCard({required this.ticket, required this.onDismiss});
+Future<void> _showOrderTypeIcons(
+  BuildContext context,
+  KitchenBoardViewModel viewModel,
+) => showModalBottomSheet<void>(
+  context: context,
+  builder: (context) => FutureBuilder<List<KdsOrderType>>(
+    future: viewModel.orderTypes(),
+    builder: (context, snapshot) => ListView(
+      children: [
+        const ListTile(title: Text('Order type icons')),
+        for (final type in snapshot.data ?? const <KdsOrderType>[])
+          ListTile(
+            title: Text(type.name),
+            trailing: DropdownButton<String>(
+              value: type.icon,
+              items: const [
+                DropdownMenuItem(
+                  value: 'restaurant',
+                  child: Icon(Icons.restaurant),
+                ),
+                DropdownMenuItem(
+                  value: 'table_restaurant',
+                  child: Icon(Icons.table_restaurant),
+                ),
+                DropdownMenuItem(
+                  value: 'takeout_dining',
+                  child: Icon(Icons.takeout_dining),
+                ),
+                DropdownMenuItem(
+                  value: 'delivery_dining',
+                  child: Icon(Icons.delivery_dining),
+                ),
+              ],
+              onChanged: (icon) async {
+                if (icon == null) return;
+                await viewModel.updateOrderTypeIcon(type.id, icon);
+                if (context.mounted) Navigator.pop(context);
+              },
+            ),
+          ),
+      ],
+    ),
+  ),
+);
 
-  final KitchenTicket ticket;
+class _TicketCard extends StatelessWidget {
+  const _TicketCard({required this.tickets, required this.onDismiss});
+
+  final List<KitchenTicket> tickets;
   final VoidCallback onDismiss;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '#${ticket.orderNumber}',
-                  style: Theme.of(context).textTheme.headlineSmall,
+  Widget build(BuildContext context) {
+    final ticket = tickets.first;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '#${ticket.orderNumber}',
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
                 ),
-              ),
-              IconButton(
-                onPressed: onDismiss,
-                icon: const Icon(Icons.close),
-                tooltip: 'Dismiss locally',
-              ),
-            ],
-          ),
-          if (ticket.tableName case final tableName?) Text(tableName),
-          if (ticket.orderName case final orderName?) Text(orderName),
-          const Divider(),
-          ...ticket.items.map(
-            (item) => Text(
-              '${item.quantity} × ${item.name}${item.comments == null || item.comments!.isEmpty ? '' : '\n${item.comments}'}',
+                IconButton(
+                  onPressed: onDismiss,
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Dismiss locally',
+                ),
+              ],
             ),
-          ),
-          if (ticket.remarks case final remarks?)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text(remarks),
-            ),
-        ],
+            if (ticket.orderTypeName case final orderType?) Text(orderType),
+            if (ticket.tableName case final tableName?)
+              Text('Table $tableName'),
+            if (ticket.staffName case final staffName?)
+              Text('Ordered by: $staffName'),
+            if (ticket.orderFor case final orderFor?)
+              Text('Order for: $orderFor'),
+            const Divider(),
+            ...tickets
+                .expand((ticket) => ticket.items)
+                .map(
+                  (item) => Text(
+                    '${item.displayQuantity} × ${item.name}${item.comments == null || item.comments!.isEmpty ? '' : '\n${item.comments}'}',
+                  ),
+                ),
+            ...tickets
+                .expand((ticket) => ticket.items)
+                .where(
+                  (item) => item.variant != null || item.modifiers.isNotEmpty,
+                )
+                .map(
+                  (item) => Text(
+                    '${item.variant == null || item.variant!.isEmpty ? '' : item.variant!}'
+                    '${item.variant == null || item.variant!.isEmpty || item.modifiers.isEmpty ? '' : ' - '}'
+                    '${item.modifiers.join(', ')}',
+                  ),
+                ),
+            if (ticket.displayRemarks case final remarks?)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(remarks),
+              ),
+            if (ticket.enteredAt case final enteredAt?)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(enteredAt.toLocal().toString()),
+              ),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

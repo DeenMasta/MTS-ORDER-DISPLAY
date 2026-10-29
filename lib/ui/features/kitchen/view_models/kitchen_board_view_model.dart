@@ -43,6 +43,11 @@ class KitchenBoardViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<List<KdsOrderType>> orderTypes() => _repository.orderTypes();
+
+  Future<void> updateOrderTypeIcon(String id, String icon) =>
+      _repository.updateOrderTypeIcon(id, icon);
+
   Future<void> _reload(DisplaySession session) async {
     _loading = true;
     _error = null;

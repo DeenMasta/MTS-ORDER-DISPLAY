@@ -55,7 +55,13 @@ class EmptyKitchenRepository implements KitchenRepository {
   Future<List<KitchenTicket>> dismiss(String ticketId) async => [];
 
   @override
+  Future<List<KdsOrderType>> orderTypes() async => [];
+
+  @override
   Future<List<KitchenTicket>> start(DisplaySession session) async => [];
+
+  @override
+  Future<void> updateOrderTypeIcon(String id, String icon) async {}
 }
 
 class EmptyPairingRepository implements PairingRepository {

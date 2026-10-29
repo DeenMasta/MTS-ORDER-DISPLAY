@@ -242,6 +242,7 @@ For each routed department:
   "order_number": 104,
   "table_name": "Table 12",
   "order_name": "Walk-in",
+  "staff_name": "Syad",
   "remarks": "No peanuts",
   "created_at": "2026-10-29T10:30:00+08:00",
   "items": [
@@ -267,6 +268,8 @@ Contract rules:
 - `action: upsert` creates or replaces the card when the revision is newer.
 - `action: cancel` removes the card because the sale/department was voided or
   cancelled. It is an order correction, not a kitchen workflow status.
+- `staff_name` is the staff member recorded on the sale and is displayed as
+  “Ordered by” on KDS.
 - KDS ignores duplicate `message_id` values and revisions older than its stored
   revision.
 

@@ -8,7 +8,7 @@ class AppDatabase {
   static Future<AppDatabase> open() async {
     final database = await openDatabase(
       'kitchen_display.db',
-      version: 2,
+      version: 3,
       onCreate: (database, version) async {
         await database.execute('''
           CREATE TABLE tickets (
@@ -35,9 +35,11 @@ class AppDatabase {
           )
         ''');
         await _createProcessedMessages(database);
+        await _createOrderTypes(database);
       },
       onUpgrade: (database, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createProcessedMessages(database);
+        if (oldVersion < 3) await _createOrderTypes(database);
       },
     );
     return AppDatabase._(database);
@@ -48,6 +50,15 @@ class AppDatabase {
         CREATE TABLE processed_messages (
           message_id TEXT PRIMARY KEY,
           received_at TEXT NOT NULL
+        )
+      ''');
+
+  static Future<void> _createOrderTypes(DatabaseExecutor database) =>
+      database.execute('''
+        CREATE TABLE order_types (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          icon TEXT NOT NULL
         )
       ''');
 }

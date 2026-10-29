@@ -42,12 +42,27 @@ class TicketStore {
         'message_id': ticket.messageId,
         'received_at': DateTime.now().toUtc().toIso8601String(),
       });
+      for (final orderType in ticket.orderTypes) {
+        await transaction.insert(
+          'order_types',
+          orderType.toJson(),
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+      if (ticket.orderTypeId != null && ticket.orderTypeName != null) {
+        await transaction.insert('order_types', {
+          'id': ticket.orderTypeId,
+          'name': ticket.orderTypeName,
+          'icon': 'restaurant',
+        }, conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
       final existing = await transaction.query(
         'tickets',
         where: 'id = ?',
         whereArgs: [ticket.id],
       );
-      if (existing.isNotEmpty && ticket.revision <= (existing.single['revision'] as int)) {
+      if (existing.isNotEmpty &&
+          ticket.revision <= (existing.single['revision'] as int)) {
         return;
       }
       await transaction.insert('tickets', {
@@ -58,6 +73,20 @@ class TicketStore {
         'updated_at': ticket.createdAt.toUtc().toIso8601String(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     });
+  }
+
+  Future<List<KdsOrderType>> orderTypes() async =>
+      (await (await _db).database.query('order_types', orderBy: 'name ASC'))
+          .map((row) => KdsOrderType.fromJson(Map<String, dynamic>.from(row)))
+          .toList(growable: false);
+
+  Future<void> updateOrderTypeIcon(String id, String icon) async {
+    await (await _db).database.update(
+      'order_types',
+      {'icon': icon},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   Future<void> dismiss(String ticketId) async {
