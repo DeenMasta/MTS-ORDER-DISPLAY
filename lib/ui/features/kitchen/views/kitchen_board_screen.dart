@@ -38,6 +38,22 @@ class _KitchenBoardScreenState extends State<KitchenBoardScreen> {
             ),
           );
         }
+        if (!widget.viewModel.isPaired) {
+          final code = widget.viewModel.pairingCode;
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(code == null ? 'Connecting to POS…' : 'Confirm this code in POS'),
+                  if (code != null)
+                    Text(code, style: Theme.of(context).textTheme.displayMedium),
+                ],
+              ),
+            ),
+          );
+        }
         if (widget.viewModel.tickets.isEmpty) {
           return const Center(child: Text('No active kitchen tickets.'));
         }

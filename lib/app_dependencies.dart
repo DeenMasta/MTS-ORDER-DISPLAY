@@ -16,15 +16,19 @@ class AppDependencies {
       storage: SecureSessionStorage(),
     );
     final connection = PosConnectionService();
+    final deviceIdentityRepository = SecureDeviceIdentityRepository();
+    final pairingRepository = LanPairingRepository(connection: connection);
     sessionViewModel = SessionViewModel(sessionRepository: sessionRepository);
     pairingViewModel = PairingViewModel(
-      pairingRepository: LanPairingRepository(connection: connection),
-      deviceIdentityRepository: SecureDeviceIdentityRepository(),
+      pairingRepository: pairingRepository,
+      deviceIdentityRepository: deviceIdentityRepository,
       sessionRepository: sessionRepository,
     );
     kitchenBoardViewModel = KitchenBoardViewModel(
       repository: StoredKitchenRepository(
         connection: connection,
+        pairingRepository: pairingRepository,
+        deviceIdentityRepository: deviceIdentityRepository,
         store: TicketStore(openDatabase: AppDatabase.open),
       ),
     );

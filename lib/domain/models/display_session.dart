@@ -1,8 +1,13 @@
 class DisplaySession {
-  const DisplaySession({required this.displayId, required this.posEndpoint});
+  const DisplaySession({
+    required this.displayId,
+    required this.posIp,
+    required this.displayName,
+  });
 
   final String displayId;
-  final String posEndpoint;
+  final String posIp;
+  final String displayName;
 
   factory DisplaySession.fromJson(Map<String, dynamic> json) {
     String value(String key) {
@@ -13,15 +18,30 @@ class DisplaySession {
       return value;
     }
 
-    final endpoint = Uri.tryParse(value('pos_endpoint'));
-    if (endpoint == null || !endpoint.hasAuthority || !{'ws', 'wss'}.contains(endpoint.scheme)) {
-      throw const FormatException('Invalid POS connection address.');
+    final posIp = json['pos_ip'] ?? _legacyPosIp(json['pos_endpoint']);
+    if (posIp is! String || posIp.trim().isEmpty || posIp.contains(RegExp(r'\s'))) {
+      throw const FormatException('Invalid POS LAN address.');
     }
-    return DisplaySession(displayId: value('display_id'), posEndpoint: endpoint.toString());
+    final storedDisplayName = json['display_name'];
+    final displayName = storedDisplayName is String && storedDisplayName.trim().isNotEmpty
+        ? storedDisplayName.trim()
+        : 'Kitchen Display';
+    return DisplaySession(
+      displayId: value('display_id'),
+      posIp: posIp.trim(),
+      displayName: displayName,
+    );
   }
 
   Map<String, dynamic> toJson() => {
     'display_id': displayId,
-    'pos_endpoint': posEndpoint,
+    'pos_ip': posIp,
+    'display_name': displayName,
   };
+
+  static String? _legacyPosIp(Object? endpoint) {
+    if (endpoint is! String) return null;
+    final parsed = Uri.tryParse(endpoint);
+    return parsed?.host;
+  }
 }

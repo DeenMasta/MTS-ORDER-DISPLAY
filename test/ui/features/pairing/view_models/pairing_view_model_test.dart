@@ -19,12 +19,11 @@ void main() {
 
     final paired = await viewModel.start(
       posAddress: '192.168.1.10',
-      posPort: '8080',
       displayName: 'Main Kitchen',
     );
 
     expect(paired, isTrue);
-    expect(sessions.saved?.posEndpoint, 'ws://192.168.1.10:8080/kds');
+    expect(sessions.saved?.posIp, '192.168.1.10');
     expect(viewModel.status, PairingStatus.idle);
   });
 
@@ -38,7 +37,6 @@ void main() {
 
     final paired = await viewModel.start(
       posAddress: '192.168.1.10',
-      posPort: '8080',
       displayName: 'Main Kitchen',
     );
 
@@ -57,7 +55,6 @@ void main() {
 
     final pairing = viewModel.start(
       posAddress: '192.168.1.10',
-      posPort: '8080',
       displayName: 'Main Kitchen',
     );
     await repository.started.future;
@@ -78,16 +75,32 @@ class FakePairingRepository implements PairingRepository {
   final Object? error;
 
   @override
+  bool get isPaired => false;
+
+  @override
+  PairingConnectionState get state => const PairingConnectionState(isPaired: false);
+
+  @override
+  Stream<PairingConnectionState> get states => Stream.empty();
+
+  @override
   Future<void> cancel() async {}
 
   @override
   Future<DisplaySession> pair({
-    required Uri posEndpoint,
-    required PairingChallenge challenge,
+    required String posIp,
+    required String displayName,
+    required String installationId,
   }) async {
     if (error != null) throw error!;
     return session!;
   }
+
+  @override
+  Future<void> resume({
+    required DisplaySession session,
+    required String installationId,
+  }) async {}
 }
 
 class FixedDeviceIdentityRepository implements DeviceIdentityRepository {
@@ -101,18 +114,34 @@ class PendingPairingRepository implements PairingRepository {
   bool wasCancelled = false;
 
   @override
+  bool get isPaired => false;
+
+  @override
+  PairingConnectionState get state => const PairingConnectionState(isPaired: false);
+
+  @override
+  Stream<PairingConnectionState> get states => Stream.empty();
+
+  @override
   Future<void> cancel() async {
     wasCancelled = true;
   }
 
   @override
   Future<DisplaySession> pair({
-    required Uri posEndpoint,
-    required PairingChallenge challenge,
+    required String posIp,
+    required String displayName,
+    required String installationId,
   }) {
     started.complete();
     return result.future;
   }
+
+  @override
+  Future<void> resume({
+    required DisplaySession session,
+    required String installationId,
+  }) async {}
 }
 
 class FakeDisplaySessionRepository implements DisplaySessionRepository {
@@ -134,5 +163,6 @@ class FakeDisplaySessionRepository implements DisplaySessionRepository {
 
 DisplaySession session() => const DisplaySession(
   displayId: 'display-1',
-  posEndpoint: 'ws://192.168.1.10:8080/kds',
+  posIp: '192.168.1.10',
+  displayName: 'Main Kitchen',
 );

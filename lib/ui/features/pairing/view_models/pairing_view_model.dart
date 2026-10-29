@@ -1,5 +1,4 @@
-import 'dart:convert';
-import 'dart:math';
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
@@ -17,7 +16,9 @@ class PairingViewModel extends ChangeNotifier {
     required DisplaySessionRepository sessionRepository,
   }) : _pairingRepository = pairingRepository,
        _deviceIdentityRepository = deviceIdentityRepository,
-       _sessionRepository = sessionRepository;
+       _sessionRepository = sessionRepository {
+    _states = _pairingRepository.states.listen(_onPairingState);
+  }
 
   final PairingRepository _pairingRepository;
   final DeviceIdentityRepository _deviceIdentityRepository;
@@ -27,6 +28,7 @@ class PairingViewModel extends ChangeNotifier {
   String? _errorMessage;
   int _attempt = 0;
   PairingStatus _status = PairingStatus.idle;
+  late final StreamSubscription<PairingConnectionState> _states;
 
   String? get code => _code;
   String? get errorMessage => _errorMessage;
@@ -34,35 +36,30 @@ class PairingViewModel extends ChangeNotifier {
 
   Future<bool> start({
     required String posAddress,
-    required String posPort,
     required String displayName,
   }) async {
     final attempt = ++_attempt;
     var pairingStarted = false;
     try {
-      final endpoint = _endpoint(posAddress, posPort);
+      final posIp = _posIp(posAddress);
       final name = displayName.trim();
       if (name.isEmpty || name.length > 120) {
         throw const FormatException('Enter a display name up to 120 characters.');
       }
-      _code = _newCode();
+      _code = null;
       _errorMessage = null;
       _status = PairingStatus.connecting;
       notifyListeners();
 
-      final challenge = PairingChallenge(
-        displayId: await _deviceIdentityRepository.getOrCreate(),
-        name: name,
-        nonce: _newNonce(),
-        code: _code!,
-      );
+      final installationId = await _deviceIdentityRepository.getOrCreate();
       if (!_isCurrent(attempt)) return false;
       _status = PairingStatus.waiting;
       notifyListeners();
       pairingStarted = true;
       final session = await _pairingRepository.pair(
-        posEndpoint: endpoint,
-        challenge: challenge,
+        posIp: posIp,
+        displayName: name,
+        installationId: installationId,
       );
       if (!_isCurrent(attempt)) return false;
       await _sessionRepository.save(session);
@@ -109,25 +106,24 @@ class PairingViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Uri _endpoint(String address, String port) {
+  String _posIp(String address) {
     final host = address.trim();
     if (host.isEmpty || host.contains(RegExp(r'\s'))) {
       throw const FormatException('Enter a valid POS LAN address.');
     }
-    final parsedPort = int.tryParse(port.trim());
-    if (parsedPort == null || parsedPort < 1 || parsedPort > 65535) {
-      throw const FormatException('POS port must be between 1 and 65535.');
-    }
-    return Uri(scheme: 'ws', host: host, port: parsedPort, path: '/kds');
+    return host;
   }
 
-  String _newCode() =>
-      Random.secure().nextInt(1000000).toString().padLeft(6, '0');
+  void _onPairingState(PairingConnectionState state) {
+    if (state.code == null) return;
+    _code = state.code;
+    _status = PairingStatus.waiting;
+    notifyListeners();
+  }
 
-  String _newNonce() {
-    final random = Random.secure();
-    return base64UrlEncode(
-      List<int>.generate(32, (_) => random.nextInt(256)),
-    ).replaceAll('=', '');
+  @override
+  void dispose() {
+    _states.cancel();
+    super.dispose();
   }
 }

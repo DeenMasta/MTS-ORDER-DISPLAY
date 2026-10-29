@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../data/repositories/kitchen_repository.dart';
 import '../../../../domain/models/display_session.dart';
 import '../../../../domain/models/kitchen_ticket.dart';
+import '../../../../domain/models/pairing.dart';
 
 class KitchenBoardViewModel extends ChangeNotifier {
   KitchenBoardViewModel({required KitchenRepository repository})
@@ -12,16 +13,28 @@ class KitchenBoardViewModel extends ChangeNotifier {
 
   final KitchenRepository _repository;
   StreamSubscription<void>? _changes;
+  StreamSubscription<PairingConnectionState>? _pairingStates;
   List<KitchenTicket> _tickets = const [];
   String? _error;
+  String? _pairingCode;
+  bool _isPaired = false;
   bool _loading = false;
 
   List<KitchenTicket> get tickets => _tickets;
   String? get error => _error;
+  String? get pairingCode => _pairingCode;
+  bool get isPaired => _isPaired;
   bool get loading => _loading;
 
   Future<void> start(DisplaySession session) async {
     _changes ??= _repository.changes.listen((_) => unawaited(_reload(session)));
+    _isPaired = _repository.pairingState.isPaired;
+    _pairingCode = _repository.pairingState.code;
+    _pairingStates ??= _repository.pairingStates.listen((state) {
+      _isPaired = state.isPaired;
+      _pairingCode = state.code;
+      notifyListeners();
+    });
     await _reload(session);
   }
 

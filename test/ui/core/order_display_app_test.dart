@@ -46,6 +46,12 @@ class EmptyKitchenRepository implements KitchenRepository {
   Stream<void> get changes => _changes.stream;
 
   @override
+  PairingConnectionState get pairingState => const PairingConnectionState(isPaired: false);
+
+  @override
+  Stream<PairingConnectionState> get pairingStates => Stream.empty();
+
+  @override
   Future<List<KitchenTicket>> dismiss(String ticketId) async => [];
 
   @override
@@ -54,13 +60,29 @@ class EmptyKitchenRepository implements KitchenRepository {
 
 class EmptyPairingRepository implements PairingRepository {
   @override
+  bool get isPaired => false;
+
+  @override
+  PairingConnectionState get state => const PairingConnectionState(isPaired: false);
+
+  @override
+  Stream<PairingConnectionState> get states => Stream.empty();
+
+  @override
   Future<void> cancel() async {}
 
   @override
   Future<DisplaySession> pair({
-    required Uri posEndpoint,
-    required PairingChallenge challenge,
+    required String posIp,
+    required String displayName,
+    required String installationId,
   }) => throw UnimplementedError();
+
+  @override
+  Future<void> resume({
+    required DisplaySession session,
+    required String installationId,
+  }) async {}
 }
 
 class FixedDeviceIdentityRepository implements DeviceIdentityRepository {

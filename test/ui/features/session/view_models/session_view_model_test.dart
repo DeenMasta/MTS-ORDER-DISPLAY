@@ -9,7 +9,8 @@ void main() {
       sessionRepository: FakeDisplaySessionRepository(
         session: const DisplaySession(
           displayId: 'display-1',
-          posEndpoint: 'ws://192.168.1.10:8080/kds',
+          posIp: '192.168.1.10',
+          displayName: 'Main Kitchen',
         ),
       ),
     );

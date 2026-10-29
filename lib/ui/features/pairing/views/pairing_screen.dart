@@ -19,21 +19,17 @@ class PairingScreen extends StatefulWidget {
 class _PairingScreenState extends State<PairingScreen> {
   final _displayNameController = TextEditingController(text: 'Kitchen Display');
   final _posAddressController = TextEditingController();
-  final _posPortController = TextEditingController();
 
   @override
   void dispose() {
-    widget.viewModel.cancel();
     _displayNameController.dispose();
     _posAddressController.dispose();
-    _posPortController.dispose();
     super.dispose();
   }
 
   Future<void> _startPairing() async {
     final paired = await widget.viewModel.start(
       posAddress: _posAddressController.text,
-      posPort: _posPortController.text,
       displayName: _displayNameController.text,
     );
     if (paired && mounted) {
@@ -57,7 +53,7 @@ class _PairingScreenState extends State<PairingScreen> {
                 const Text('Enter the address shown in POS settings.'),
                 const SizedBox(height: 16),
                 _field(_posAddressController, 'POS LAN address', '192.168.1.10'),
-                _field(_posPortController, 'POS WebSocket port', '8080', number: true),
+                const Text('Connects to ws://POS-IP:8080/kds'),
                 const Divider(height: 40),
                 _field(_displayNameController, 'Display name', 'Main Kitchen'),
                 if (widget.viewModel.code case final code?) ...[
@@ -91,13 +87,11 @@ class _PairingScreenState extends State<PairingScreen> {
   Widget _field(
     TextEditingController controller,
     String label,
-    String hint, {
-    bool number = false,
-  }) => Padding(
+    String hint,
+  ) => Padding(
     padding: const EdgeInsets.only(bottom: 12),
     child: TextField(
       controller: controller,
-      keyboardType: number ? TextInputType.number : TextInputType.text,
       decoration: InputDecoration(border: const OutlineInputBorder(), hintText: hint, labelText: label),
     ),
   );

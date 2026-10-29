@@ -3,18 +3,40 @@ import 'dart:convert';
 
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-class PosConnectionService {
+abstract interface class PosConnection {
+  Stream<void> get connections;
+  Stream<void> get disconnections;
+  Stream<Map<String, dynamic>> get messages;
+
+  Future<void> close();
+  Future<void> connect(Uri endpoint);
+  void send(Map<String, dynamic> message);
+}
+
+class PosConnectionService implements PosConnection {
   final _messages = StreamController<Map<String, dynamic>>.broadcast();
+  final _connections = StreamController<void>.broadcast();
+  final _disconnections = StreamController<void>.broadcast();
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _subscription;
   Uri? _endpoint;
   Timer? _reconnectTimer;
+  int _reconnectAttempt = 0;
 
+  @override
+  Stream<void> get connections => _connections.stream;
+
+  @override
+  Stream<void> get disconnections => _disconnections.stream;
+
+  @override
   Stream<Map<String, dynamic>> get messages => _messages.stream;
 
+  @override
   Future<void> connect(Uri endpoint) async {
     if (_channel != null && _endpoint == endpoint) return;
     _reconnectTimer?.cancel();
+    _reconnectAttempt = 0;
     await _closeChannel();
     await _open(endpoint);
   }
@@ -39,33 +61,40 @@ class PosConnectionService {
         if (identical(_channel, channel)) {
           _channel = null;
           _endpoint = null;
-          _reconnect(endpoint);
+          _disconnections.add(null);
+          _scheduleReconnect(endpoint);
         }
       },
     );
+    _connections.add(null);
   }
 
-  void _reconnect(Uri endpoint) {
-    // shortcut: fixed retry delay; add backoff only if outlet networks need it.
+  void _scheduleReconnect(Uri endpoint) {
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(const Duration(seconds: 3), () async {
+    final exponent = _reconnectAttempt > 5 ? 5 : _reconnectAttempt;
+    final seconds = 1 << exponent;
+    _reconnectAttempt++;
+    _reconnectTimer = Timer(Duration(seconds: seconds), () async {
       try {
         await _open(endpoint);
       } catch (_) {
-        _reconnect(endpoint);
+        _scheduleReconnect(endpoint);
       }
     });
   }
 
+  @override
   void send(Map<String, dynamic> message) {
     final channel = _channel;
     if (channel == null) throw StateError('POS connection is not open.');
     channel.sink.add(jsonEncode(message));
   }
 
+  @override
   Future<void> close() async {
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    _reconnectAttempt = 0;
     await _closeChannel();
   }
 
