@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mysztech_order_display/data/repositories/device_identity_repository.dart';
+import 'package:mysztech_order_display/data/repositories/display_settings_repository.dart';
 import 'package:mysztech_order_display/data/repositories/display_session_repository.dart';
 import 'package:mysztech_order_display/data/repositories/kitchen_repository.dart';
 import 'package:mysztech_order_display/data/repositories/pairing_repository.dart';
 import 'package:mysztech_order_display/domain/models/display_session.dart';
+import 'package:mysztech_order_display/domain/models/kds_settings.dart';
 import 'package:mysztech_order_display/domain/models/kitchen_ticket.dart';
 import 'package:mysztech_order_display/domain/models/pairing.dart';
 import 'package:mysztech_order_display/ui/core/order_display_app.dart';
@@ -29,6 +31,7 @@ void main() {
         ),
         kitchenBoardViewModel: KitchenBoardViewModel(
           repository: EmptyKitchenRepository(),
+          settingsRepository: EmptySettingsRepository(),
         ),
       ),
     );
@@ -39,6 +42,14 @@ void main() {
   });
 }
 
+class EmptySettingsRepository implements DisplaySettingsRepository {
+  @override
+  Future<KdsSettings> load() async => const KdsSettings();
+
+  @override
+  Future<void> save(KdsSettings settings) async {}
+}
+
 class EmptyKitchenRepository implements KitchenRepository {
   final StreamController<void> _changes = StreamController<void>.broadcast();
 
@@ -46,7 +57,8 @@ class EmptyKitchenRepository implements KitchenRepository {
   Stream<void> get changes => _changes.stream;
 
   @override
-  PairingConnectionState get pairingState => const PairingConnectionState(isPaired: false);
+  PairingConnectionState get pairingState =>
+      const PairingConnectionState(isPaired: false);
 
   @override
   Stream<PairingConnectionState> get pairingStates => Stream.empty();
@@ -69,7 +81,8 @@ class EmptyPairingRepository implements PairingRepository {
   bool get isPaired => false;
 
   @override
-  PairingConnectionState get state => const PairingConnectionState(isPaired: false);
+  PairingConnectionState get state =>
+      const PairingConnectionState(isPaired: false);
 
   @override
   Stream<PairingConnectionState> get states => Stream.empty();

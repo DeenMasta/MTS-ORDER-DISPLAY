@@ -34,6 +34,7 @@ class SessionGate extends StatelessWidget {
         SessionStatus.paired => KitchenBoardScreen(
           viewModel: kitchenBoardViewModel,
           session: sessionViewModel.session!,
+          onChangeConnection: sessionViewModel.changeConnection,
         ),
         SessionStatus.error => _StatusScreen(
           title: 'Unable to start kitchen display',

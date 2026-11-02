@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mysztech_order_display/data/repositories/device_identity_repository.dart';
 import 'package:mysztech_order_display/data/repositories/kitchen_repository.dart';
 import 'package:mysztech_order_display/data/repositories/pairing_repository.dart';
-import 'package:mysztech_order_display/data/services/app_database.dart';
 import 'package:mysztech_order_display/data/services/pos_connection_service.dart';
 import 'package:mysztech_order_display/data/services/ticket_store.dart';
 import 'package:mysztech_order_display/domain/models/display_session.dart';
@@ -12,33 +11,44 @@ import 'package:mysztech_order_display/domain/models/kitchen_ticket.dart';
 import 'package:mysztech_order_display/domain/models/pairing.dart';
 
 void main() {
-  test('does not accept an order before the current socket is paired', () async {
-    final pairing = FakePairingRepository(isPaired: false);
-    final connection = FakePosConnection();
-    final repository = _repository(connection, pairing, FakeTicketStore());
-    await repository.start(session);
+  test(
+    'does not accept an order before the current socket is paired',
+    () async {
+      final pairing = FakePairingRepository(isPaired: false);
+      final connection = FakePosConnection();
+      final repository = _repository(connection, pairing, FakeTicketStore());
+      await repository.start(session);
 
-    connection.receive(order());
-    await _settle();
+      connection.receive(order());
+      await _settle();
 
-    expect(connection.sent, isEmpty);
-  });
+      expect(connection.sent, isEmpty);
+    },
+  );
 
-  test('acknowledges duplicate messages after each durable write attempt', () async {
-    final pairing = FakePairingRepository(isPaired: true);
-    final connection = FakePosConnection();
-    final store = FakeTicketStore();
-    final repository = _repository(connection, pairing, store);
-    await repository.start(session);
+  test(
+    'acknowledges duplicate messages after each durable write attempt',
+    () async {
+      final pairing = FakePairingRepository(isPaired: true);
+      final connection = FakePosConnection();
+      final store = FakeTicketStore();
+      final repository = _repository(connection, pairing, store);
+      await repository.start(session);
 
-    connection.receive(order());
-    connection.receive(order());
-    await _settle();
+      connection.receive(order());
+      connection.receive(order());
+      await _settle();
 
-    expect(store.active, hasLength(1));
-    expect(connection.receipts, hasLength(2));
-    expect(connection.receipts.every((receipt) => receipt['message_id'] == 'message-1'), isTrue);
-  });
+      expect(store.active, hasLength(1));
+      expect(connection.receipts, hasLength(2));
+      expect(
+        connection.receipts.every(
+          (receipt) => receipt['message_id'] == 'message-1',
+        ),
+        isTrue,
+      );
+    },
+  );
 
   test('keeps a newer revision when an older message arrives later', () async {
     final pairing = FakePairingRepository(isPaired: true);
@@ -63,7 +73,9 @@ void main() {
     await repository.start(session);
 
     connection.receive(order());
-    connection.receive(order(messageId: 'cancel-1', revision: 2, action: 'cancel'));
+    connection.receive(
+      order(messageId: 'cancel-1', revision: 2, action: 'cancel'),
+    );
     await _settle();
 
     expect(store.active, isEmpty);
@@ -143,7 +155,8 @@ class FakePairingRepository implements PairingRepository {
   final _states = StreamController<PairingConnectionState>.broadcast();
 
   @override
-  PairingConnectionState get state => PairingConnectionState(isPaired: isPaired);
+  PairingConnectionState get state =>
+      PairingConnectionState(isPaired: isPaired);
 
   @override
   Stream<PairingConnectionState> get states => _states.stream;
@@ -174,8 +187,9 @@ class FakePosConnection implements PosConnection {
   final _messages = StreamController<Map<String, dynamic>>.broadcast();
   final sent = <Map<String, dynamic>>[];
 
-  List<Map<String, dynamic>> get receipts =>
-      sent.where((message) => message['type'] == 'kitchen_order.received').toList();
+  List<Map<String, dynamic>> get receipts => sent
+      .where((message) => message['type'] == 'kitchen_order.received')
+      .toList();
 
   @override
   Stream<void> get connections => _connections.stream;

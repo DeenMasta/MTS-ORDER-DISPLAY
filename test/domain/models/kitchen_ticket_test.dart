@@ -85,7 +85,10 @@ void main() {
 
   test('formats whole item quantities without a decimal', () {
     expect(
-      const KitchenTicketItem(name: 'Nasi goreng', quantity: 1.0).displayQuantity,
+      const KitchenTicketItem(
+        name: 'Nasi goreng',
+        quantity: 1.0,
+      ).displayQuantity,
       '1',
     );
     expect(

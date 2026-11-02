@@ -11,23 +11,26 @@ import 'package:mysztech_order_display/ui/features/pairing/view_models/pairing_v
 import 'package:mysztech_order_display/ui/features/pairing/views/pairing_screen.dart';
 
 void main() {
-  testWidgets('does not close the POS connection when the setup screen unmounts', (
-    tester,
-  ) async {
-    final pairingRepository = TrackingPairingRepository();
-    final viewModel = PairingViewModel(
-      pairingRepository: pairingRepository,
-      deviceIdentityRepository: FixedDeviceIdentityRepository(),
-      sessionRepository: MemoryDisplaySessionRepository(),
-    );
+  testWidgets(
+    'does not close the POS connection when the setup screen unmounts',
+    (tester) async {
+      final pairingRepository = TrackingPairingRepository();
+      final viewModel = PairingViewModel(
+        pairingRepository: pairingRepository,
+        deviceIdentityRepository: FixedDeviceIdentityRepository(),
+        sessionRepository: MemoryDisplaySessionRepository(),
+      );
 
-    await tester.pumpWidget(
-      MaterialApp(home: PairingScreen(viewModel: viewModel, onPaired: () async {})),
-    );
-    await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(
+        MaterialApp(
+          home: PairingScreen(viewModel: viewModel, onPaired: () async {}),
+        ),
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
 
-    expect(pairingRepository.cancelCalls, 0);
-  });
+      expect(pairingRepository.cancelCalls, 0);
+    },
+  );
 }
 
 class TrackingPairingRepository implements PairingRepository {
@@ -38,7 +41,8 @@ class TrackingPairingRepository implements PairingRepository {
   bool get isPaired => false;
 
   @override
-  PairingConnectionState get state => const PairingConnectionState(isPaired: false);
+  PairingConnectionState get state =>
+      const PairingConnectionState(isPaired: false);
 
   @override
   Stream<PairingConnectionState> get states => _states.stream;

@@ -19,11 +19,14 @@ class DisplaySession {
     }
 
     final posIp = json['pos_ip'] ?? _legacyPosIp(json['pos_endpoint']);
-    if (posIp is! String || posIp.trim().isEmpty || posIp.contains(RegExp(r'\s'))) {
+    if (posIp is! String ||
+        posIp.trim().isEmpty ||
+        posIp.contains(RegExp(r'\s'))) {
       throw const FormatException('Invalid POS LAN address.');
     }
     final storedDisplayName = json['display_name'];
-    final displayName = storedDisplayName is String && storedDisplayName.trim().isNotEmpty
+    final displayName =
+        storedDisplayName is String && storedDisplayName.trim().isNotEmpty
         ? storedDisplayName.trim()
         : 'Kitchen Display';
     return DisplaySession(

@@ -45,25 +45,38 @@ class _PairingScreenState extends State<PairingScreen> {
         child: ListenableBuilder(
           listenable: widget.viewModel,
           builder: (context, child) {
-            final waiting = widget.viewModel.status == PairingStatus.connecting ||
+            final waiting =
+                widget.viewModel.status == PairingStatus.connecting ||
                 widget.viewModel.status == PairingStatus.waiting;
             return ListView(
               padding: const EdgeInsets.all(24),
               children: [
                 const Text('Enter the address shown in POS settings.'),
                 const SizedBox(height: 16),
-                _field(_posAddressController, 'POS LAN address', '192.168.1.10'),
+                _field(
+                  _posAddressController,
+                  'POS LAN address',
+                  '192.168.1.10',
+                ),
                 const Text('Connects to ws://POS-IP:8080/kds'),
                 const Divider(height: 40),
                 _field(_displayNameController, 'Display name', 'Main Kitchen'),
                 if (widget.viewModel.code case final code?) ...[
                   const SizedBox(height: 24),
-                  Text('Confirm this code in POS', style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    'Confirm this code in POS',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                   Text(code, style: Theme.of(context).textTheme.displayMedium),
                 ],
                 if (widget.viewModel.errorMessage case final message?) ...[
                   const SizedBox(height: 16),
-                  Text(message, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  Text(
+                    message,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
                 ],
                 const SizedBox(height: 24),
                 if (waiting)
@@ -84,15 +97,16 @@ class _PairingScreenState extends State<PairingScreen> {
     );
   }
 
-  Widget _field(
-    TextEditingController controller,
-    String label,
-    String hint,
-  ) => Padding(
-    padding: const EdgeInsets.only(bottom: 12),
-    child: TextField(
-      controller: controller,
-      decoration: InputDecoration(border: const OutlineInputBorder(), hintText: hint, labelText: label),
-    ),
-  );
+  Widget _field(TextEditingController controller, String label, String hint) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            hintText: hint,
+            labelText: label,
+          ),
+        ),
+      );
 }

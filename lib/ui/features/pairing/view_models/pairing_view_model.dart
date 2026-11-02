@@ -44,7 +44,9 @@ class PairingViewModel extends ChangeNotifier {
       final posIp = _posIp(posAddress);
       final name = displayName.trim();
       if (name.isEmpty || name.length > 120) {
-        throw const FormatException('Enter a display name up to 120 characters.');
+        throw const FormatException(
+          'Enter a display name up to 120 characters.',
+        );
       }
       _code = null;
       _errorMessage = null;

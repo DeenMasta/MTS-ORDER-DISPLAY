@@ -148,8 +148,8 @@ class KitchenTicket {
       remarks: json['remarks'] as String?,
       orderTypeId: (json['order_type'] as Map?)?['id'] as String?,
       orderTypeName: (json['order_type'] as Map?)?['name'] as String?,
-      staffName: _optionalString(json['staff_name']) ??
-          _optionalString(json['staff']),
+      staffName:
+          _optionalString(json['staff_name']) ?? _optionalString(json['staff']),
       orderedBy: json['ordered_by'] as String?,
       orderFor: json['order_for'] as String?,
       enteredAt: DateTime.tryParse(json['entered_at'] as String? ?? ''),

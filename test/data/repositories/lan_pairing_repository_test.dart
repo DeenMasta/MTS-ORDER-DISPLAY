@@ -5,31 +5,34 @@ import 'package:mysztech_order_display/data/repositories/pairing_repository.dart
 import 'package:mysztech_order_display/data/services/pos_connection_service.dart';
 
 void main() {
-  test('pairs on port 8080 and stores the Laravel display ID separately', () async {
-    final connection = FakePosConnection();
-    final repository = LanPairingRepository(connection: connection);
+  test(
+    'pairs on port 8080 and stores the Laravel display ID separately',
+    () async {
+      final connection = FakePosConnection();
+      final repository = LanPairingRepository(connection: connection);
 
-    final pairing = repository.pair(
-      posIp: '192.168.1.10',
-      displayName: 'Main Kitchen',
-      installationId: 'installation-uuid',
-    );
-    await _settle();
+      final pairing = repository.pair(
+        posIp: '192.168.1.10',
+        displayName: 'Main Kitchen',
+        installationId: 'installation-uuid',
+      );
+      await _settle();
 
-    expect(connection.endpoint.toString(), 'ws://192.168.1.10:8080/kds');
-    expect(connection.sent.single['display_id'], 'installation-uuid');
-    final firstChallenge = connection.sent.single;
-    connection.receive({
-      'type': 'pair.confirmed',
-      'display_id': 'laravel-display-id',
-      'protocol': 'kitchen-order.v1',
-    });
+      expect(connection.endpoint.toString(), 'ws://192.168.1.10:8080/kds');
+      expect(connection.sent.single['display_id'], 'installation-uuid');
+      final firstChallenge = connection.sent.single;
+      connection.receive({
+        'type': 'pair.confirmed',
+        'display_id': 'laravel-display-id',
+        'protocol': 'kitchen-order.v1',
+      });
 
-    final session = await pairing;
-    expect(session.displayId, 'laravel-display-id');
-    expect(session.posIp, '192.168.1.10');
-    expect(firstChallenge['display_id'], isNot(session.displayId));
-  });
+      final session = await pairing;
+      expect(session.displayId, 'laravel-display-id');
+      expect(session.posIp, '192.168.1.10');
+      expect(firstChallenge['display_id'], isNot(session.displayId));
+    },
+  );
 
   test('a new socket resets pairing and sends a fresh challenge', () async {
     final connection = FakePosConnection();
@@ -60,7 +63,10 @@ void main() {
     expect(repository.isPaired, isFalse);
     expect(secondChallenge['nonce'], isNot(firstChallenge['nonce']));
     expect(secondChallenge['code'], isNot(firstChallenge['code']));
-    expect((secondChallenge['code']! as String).length, inInclusiveRange(4, 32));
+    expect(
+      (secondChallenge['code']! as String).length,
+      inInclusiveRange(4, 32),
+    );
   });
 }
 
