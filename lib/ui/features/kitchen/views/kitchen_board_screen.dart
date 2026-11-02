@@ -113,11 +113,15 @@ class _KitchenBoardBody extends StatelessWidget {
     if (viewModel.loading && viewModel.tickets.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (viewModel.error case final error?) {
+    if (viewModel.error case final error? when viewModel.tickets.isEmpty) {
       return _StatusMessage(
         message: error,
+        detail:
+            'Check that POS at ${session.posIp}:8080 is online and on the same Wi-Fi.',
         actionLabel: 'Retry connection',
         onAction: () => viewModel.start(session),
+        secondaryActionLabel: 'Change POS connection',
+        onSecondaryAction: onChangeConnection,
       );
     }
     return LayoutBuilder(
@@ -562,12 +566,18 @@ class _Pager extends StatelessWidget {
 class _StatusMessage extends StatelessWidget {
   const _StatusMessage({
     required this.message,
+    this.detail,
     this.actionLabel,
     this.onAction,
+    this.secondaryActionLabel,
+    this.onSecondaryAction,
   });
   final String message;
+  final String? detail;
   final String? actionLabel;
   final VoidCallback? onAction;
+  final String? secondaryActionLabel;
+  final VoidCallback? onSecondaryAction;
   @override
   Widget build(BuildContext context) => Center(
     child: Column(
@@ -577,10 +587,23 @@ class _StatusMessage extends StatelessWidget {
           message,
           style: const TextStyle(color: Colors.white, fontSize: 20),
         ),
+        if (detail case final detail?) ...[
+          const SizedBox(height: 8),
+          Text(
+            detail,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white70),
+          ),
+        ],
         if (onAction != null) ...[
           const SizedBox(height: 16),
           FilledButton(onPressed: onAction, child: Text(actionLabel!)),
         ],
+        if (onSecondaryAction != null)
+          TextButton(
+            onPressed: onSecondaryAction,
+            child: Text(secondaryActionLabel!),
+          ),
       ],
     ),
   );
