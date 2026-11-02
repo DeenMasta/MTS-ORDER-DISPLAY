@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mysztech_order_display/data/repositories/pairing_repository.dart';
 import 'package:mysztech_order_display/data/services/pos_connection_service.dart';
+import 'package:mysztech_order_display/domain/models/display_session.dart';
 
 void main() {
   test(
@@ -67,6 +68,39 @@ void main() {
       (secondChallenge['code']! as String).length,
       inInclusiveRange(4, 32),
     );
+  });
+
+  test('resumes a stored display without asking to pair again', () async {
+    final connection = FakePosConnection();
+    final repository = LanPairingRepository(connection: connection);
+
+    await repository.resume(
+      session: const DisplaySession(
+        displayId: 'laravel-display-id',
+        posIp: '192.168.1.10',
+        displayName: 'Main Kitchen',
+      ),
+      installationId: 'installation-uuid',
+    );
+    await _settle();
+
+    expect(connection.endpoint.toString(), 'ws://192.168.1.10:8080/kds');
+    expect(connection.sent, [
+      {
+        'type': 'pair.resume',
+        'display_id': 'laravel-display-id',
+        'protocol': 'kitchen-order.v1',
+      },
+    ]);
+
+    connection.receive({
+      'type': 'pair.confirmed',
+      'display_id': 'laravel-display-id',
+      'protocol': 'kitchen-order.v1',
+    });
+    await _settle();
+
+    expect(repository.isPaired, isTrue);
   });
 }
 

@@ -34,6 +34,7 @@ class LanPairingRepository implements PairingRepository {
   String? _displayName;
   String? _installationId;
   String? _posIp;
+  String? _resumingDisplayId;
   PairingConnectionState _state = const PairingConnectionState(isPaired: false);
 
   @override
@@ -51,6 +52,7 @@ class LanPairingRepository implements PairingRepository {
     required String displayName,
     required String installationId,
   }) async {
+    _resumingDisplayId = null;
     _configure(
       posIp: posIp,
       displayName: displayName,
@@ -67,6 +69,7 @@ class LanPairingRepository implements PairingRepository {
     required DisplaySession session,
     required String installationId,
   }) async {
+    _resumingDisplayId = session.displayId;
     _configure(
       posIp: session.posIp,
       displayName: session.displayName,
@@ -106,6 +109,20 @@ class LanPairingRepository implements PairingRepository {
       Uri(scheme: 'ws', host: _posIp!, port: 8080, path: '/kds');
 
   void _sendChallenge() {
+    final resumingDisplayId = _resumingDisplayId;
+    if (resumingDisplayId != null) {
+      _setState(const PairingConnectionState(isPaired: false));
+      try {
+        _connection.send({
+          'type': 'pair.resume',
+          'display_id': resumingDisplayId,
+          'protocol': 'kitchen-order.v1',
+        });
+      } on Object {
+        // The socket closed between the connection event and resume send.
+      }
+      return;
+    }
     final displayName = _displayName;
     final installationId = _installationId;
     if (displayName == null || installationId == null) return;
