@@ -5,6 +5,7 @@ import '../../../../domain/models/kds_settings.dart';
 import '../../../../domain/models/kitchen_ticket.dart';
 import '../view_models/kitchen_board_view_model.dart';
 import 'kitchen_settings_screen.dart';
+import 'slanted_timer_clipper.dart';
 
 class KitchenBoardScreen extends StatefulWidget {
   const KitchenBoardScreen({
@@ -53,48 +54,12 @@ class _BrandPatternBackground extends StatelessWidget {
   const _BrandPatternBackground();
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      const tileWidth = 230.0;
-      const tileHeight = 155.0;
-      final columns = (constraints.maxWidth / tileWidth).ceil() + 1;
-      final rows = (constraints.maxHeight / tileHeight).ceil() + 1;
-      return IgnorePointer(
-        child: ClipRect(
-          child: Stack(
-            children: [
-              for (var row = 0; row < rows; row++)
-                for (var column = 0; column < columns; column++)
-                  Positioned(
-                    left: column * tileWidth - 45 + (row.isOdd ? 45 : 0),
-                    top: row * tileHeight - 30,
-                    child: Transform.rotate(
-                      angle: -.20,
-                      child: Opacity(
-                        opacity: .075,
-                        child: Image.asset(
-                          'assets/images/mysztech_logo.png',
-                          width: 185,
-                        ),
-                      ),
-                    ),
-                  ),
-              const Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xAA030B15), Color(0xDD030B15)],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    },
+  Widget build(BuildContext context) => Stack(
+    fit: StackFit.expand,
+    children: [
+      Image.asset('assets/images/kds_background.png', fit: BoxFit.cover),
+      const ColoredBox(color: Color(0x9900060D)),
+    ],
   );
 }
 
@@ -124,54 +89,56 @@ class _KitchenBoardBody extends StatelessWidget {
         onSecondaryAction: onChangeConnection,
       );
     }
-    return LayoutBuilder(
-      builder: (context, constraints) => Padding(
-        padding: const EdgeInsets.all(28),
-        child: Column(
-          children: [
-            _Header(
-              orderCount: viewModel.ticketGroups.length,
-              onSettings: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (context) => KitchenSettingsScreen(
-                    viewModel: viewModel,
-                    session: session,
-                    onChangeConnection: onChangeConnection,
-                  ),
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          _Header(
+            orderCount: viewModel.ticketGroups.length,
+            onSettings: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (context) => KitchenSettingsScreen(
+                  viewModel: viewModel,
+                  session: session,
+                  onChangeConnection: onChangeConnection,
                 ),
               ),
-              onHistory: () => _showHistoryUnavailable(context),
             ),
-            if (!viewModel.isPaired) ...[
-              const SizedBox(height: 12),
-              _ConnectionStatus(code: viewModel.pairingCode),
-            ],
-            const SizedBox(height: 28),
-            _FilterBar(viewModel: viewModel),
-            const SizedBox(height: 28),
-            Expanded(
-              child: viewModel.visibleTicketGroups.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No active kitchen tickets.',
-                        style: TextStyle(color: Colors.white70, fontSize: 18),
-                      ),
-                    )
-                  : _TicketGrid(
-                      groups: viewModel.visibleTicketGroups,
-                      iconNameFor: viewModel.orderTypeIconNameFor,
-                      settings: viewModel.settings,
-                      onDismiss: (tickets) async {
-                        for (final ticket in tickets) {
-                          await viewModel.dismiss(ticket.id);
-                        }
-                      },
-                    ),
-            ),
+            onHistory: () => _showHistoryUnavailable(context),
+          ),
+          if (!viewModel.isPaired) ...[
             const SizedBox(height: 12),
-            _Pager(viewModel: viewModel),
+            _ConnectionStatus(code: viewModel.pairingCode),
           ],
-        ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: _FilterBar(viewModel: viewModel),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: viewModel.visibleTicketGroups.isEmpty
+                ? const Center(
+                    child: Text(
+                      'No active kitchen tickets.',
+                      style: TextStyle(color: Colors.white70, fontSize: 18),
+                    ),
+                  )
+                : _TicketPager(
+                    viewModel: viewModel,
+                    groups: viewModel.ticketGroups,
+                    iconNameFor: viewModel.orderTypeIconNameFor,
+                    settings: viewModel.settings,
+                    isCrossed: viewModel.isItemCrossed,
+                    onToggle: viewModel.toggleItemCrossed,
+                    completionSecondsRemaining:
+                        viewModel.completionSecondsRemaining,
+                    onComplete: viewModel.completeLocally,
+                  ),
+          ),
+          const SizedBox(height: 6),
+          _Pager(viewModel: viewModel),
+        ],
       ),
     );
   }
@@ -223,12 +190,12 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    height: 92,
-    padding: const EdgeInsets.symmetric(horizontal: 34),
+    height: 58,
+    padding: const EdgeInsets.symmetric(horizontal: 16),
     decoration: BoxDecoration(
       color: const Color(0xDD02070D),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: Colors.blueGrey.shade300, width: 2),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.blueGrey.shade300),
     ),
     child: Row(
       children: [
@@ -236,49 +203,75 @@ class _Header extends StatelessWidget {
           'Orders: ${orderCount.toString().padLeft(2, '0')}',
           style: const TextStyle(
             color: Colors.white,
-            fontSize: 22,
+            fontSize: 14,
             fontWeight: FontWeight.w700,
           ),
         ),
         const Spacer(),
-        Image.asset('assets/images/mysztech_logo.png', height: 58),
+        Image.asset('assets/images/mysztech_logo.png', height: 37),
         const Spacer(),
-        PopupMenuButton<_HeaderAction>(
-          tooltip: 'Display menu',
-          icon: const Icon(Icons.menu, color: Colors.white, size: 38),
-          onSelected: (value) {
-            switch (value) {
-              case _HeaderAction.liveOrders:
-                break;
-              case _HeaderAction.history:
-                onHistory();
-              case _HeaderAction.settings:
-                onSettings();
-            }
-          },
-          itemBuilder: (context) => const [
-            PopupMenuItem(
-              value: _HeaderAction.liveOrders,
-              child: ListTile(
-                leading: Icon(Icons.receipt_long_outlined),
-                title: Text('Live orders'),
-              ),
+        PopupMenuTheme(
+          data: PopupMenuThemeData(
+            color: const Color(0xFF0D263A),
+            surfaceTintColor: Colors.transparent,
+            textStyle: const TextStyle(color: Colors.white),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Color(0xFF1B9ED8)),
             ),
-            PopupMenuItem(
-              value: _HeaderAction.history,
-              child: ListTile(
-                leading: Icon(Icons.history),
-                title: Text('Order history'),
+          ),
+          child: PopupMenuButton<_HeaderAction>(
+            tooltip: 'Display menu',
+            icon: const Icon(Icons.menu, color: Colors.white, size: 26),
+            onSelected: (value) {
+              switch (value) {
+                case _HeaderAction.liveOrders:
+                  break;
+                case _HeaderAction.history:
+                  onHistory();
+                case _HeaderAction.settings:
+                  onSettings();
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: _HeaderAction.liveOrders,
+                child: ListTile(
+                  leading: Icon(
+                    Icons.receipt_long_outlined,
+                    color: Color(0xFF38BDF8),
+                  ),
+                  title: Text(
+                    'Live orders',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
               ),
-            ),
-            PopupMenuItem(
-              value: _HeaderAction.settings,
-              child: ListTile(
-                leading: Icon(Icons.settings_outlined),
-                title: Text('Settings'),
+              PopupMenuItem(
+                value: _HeaderAction.history,
+                child: ListTile(
+                  leading: Icon(Icons.history, color: Color(0xFF38BDF8)),
+                  title: Text(
+                    'Order history',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
               ),
-            ),
-          ],
+              PopupMenuItem(
+                value: _HeaderAction.settings,
+                child: ListTile(
+                  leading: Icon(
+                    Icons.settings_outlined,
+                    color: Color(0xFF38BDF8),
+                  ),
+                  title: Text(
+                    'Settings',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     ),
@@ -291,66 +284,157 @@ class _FilterBar extends StatelessWidget {
   const _FilterBar({required this.viewModel});
   final KitchenBoardViewModel viewModel;
   @override
-  Widget build(BuildContext context) => Wrap(
-    spacing: 24,
-    runSpacing: 12,
-    children: viewModel.availableFilters
-        .map(
-          (filter) => ChoiceChip(
-            label: Text(filter.label.toUpperCase()),
-            selected: viewModel.filter == filter,
-            onSelected: (_) => viewModel.selectFilter(filter),
-            labelStyle: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: viewModel.filter == filter ? Colors.white : Colors.black,
+  Widget build(BuildContext context) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    child: Row(
+      children: viewModel.availableFilters
+          .map(
+            (filter) => Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(filter.label.toUpperCase()),
+                selected: viewModel.filter == filter,
+                onSelected: (_) => viewModel.selectFilter(filter),
+                labelStyle: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: viewModel.filter == filter
+                      ? Colors.white
+                      : Colors.black,
+                ),
+                selectedColor: Colors.black,
+                backgroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 6,
+                ),
+                shape: const StadiumBorder(),
+              ),
             ),
-            selectedColor: Colors.black,
-            backgroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 13),
-            shape: const StadiumBorder(),
-          ),
-        )
-        .toList(growable: false),
+          )
+          .toList(growable: false),
+    ),
+  );
+}
+
+class _TicketPager extends StatefulWidget {
+  const _TicketPager({
+    required this.viewModel,
+    required this.groups,
+    required this.iconNameFor,
+    required this.settings,
+    required this.isCrossed,
+    required this.onToggle,
+    required this.completionSecondsRemaining,
+    required this.onComplete,
+  });
+
+  final KitchenBoardViewModel viewModel;
+  final List<List<KitchenTicket>> groups;
+  final String Function(KitchenTicket) iconNameFor;
+  final KdsSettings settings;
+  final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
+  final void Function(KitchenTicket ticket, int itemIndex) onToggle;
+  final int Function(List<KitchenTicket>) completionSecondsRemaining;
+  final ValueChanged<List<KitchenTicket>> onComplete;
+
+  @override
+  State<_TicketPager> createState() => _TicketPagerState();
+}
+
+class _TicketPagerState extends State<_TicketPager> {
+  late final PageController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController(initialPage: widget.viewModel.page);
+  }
+
+  @override
+  void didUpdateWidget(covariant _TicketPager oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_controller.hasClients &&
+        _controller.page?.round() != widget.viewModel.page) {
+      _controller.animateToPage(
+        widget.viewModel.page,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => PageView.builder(
+    controller: _controller,
+    clipBehavior: Clip.hardEdge,
+    pageSnapping: true,
+    itemCount: widget.viewModel.pageCount,
+    onPageChanged: widget.viewModel.showPage,
+    itemBuilder: (context, page) => _TicketGrid(
+      groups: widget.groups.skip(page * 4).take(4).toList(growable: false),
+      iconNameFor: widget.iconNameFor,
+      settings: widget.settings,
+      isCrossed: widget.isCrossed,
+      onToggle: widget.onToggle,
+      completionSecondsRemaining: widget.completionSecondsRemaining,
+      onComplete: widget.onComplete,
+    ),
   );
 }
 
 class _TicketGrid extends StatelessWidget {
   const _TicketGrid({
     required this.groups,
-    required this.onDismiss,
     required this.iconNameFor,
     required this.settings,
+    required this.isCrossed,
+    required this.onToggle,
+    required this.completionSecondsRemaining,
+    required this.onComplete,
   });
   final List<List<KitchenTicket>> groups;
-  final ValueChanged<List<KitchenTicket>> onDismiss;
   final String Function(KitchenTicket) iconNameFor;
   final KdsSettings settings;
+  final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
+  final void Function(KitchenTicket ticket, int itemIndex) onToggle;
+  final int Function(List<KitchenTicket>) completionSecondsRemaining;
+  final ValueChanged<List<KitchenTicket>> onComplete;
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      final columns = constraints.maxWidth >= 1050
-          ? 3
-          : constraints.maxWidth >= 650
+      final columns = constraints.maxWidth >= 900
+          ? 4
+          : constraints.maxWidth >= 560
           ? 2
           : 1;
       return GridView.builder(
         itemCount: groups.length,
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: columns,
-          crossAxisSpacing: 28,
-          mainAxisSpacing: 28,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
           childAspectRatio: columns == 1
-              ? 1.15
+              ? .62
               : settings.compactCards
-              ? .83
-              : .70,
+              ? .76
+              : .62,
         ),
+        physics: const NeverScrollableScrollPhysics(),
         itemBuilder: (context, index) => _TicketCard(
           tickets: groups[index],
-          onDismiss: () => onDismiss(groups[index]),
           iconName: iconNameFor(groups[index].first),
           settings: settings,
+          isCrossed: isCrossed,
+          onToggle: onToggle,
+          secondsRemaining: completionSecondsRemaining(groups[index]),
+          onComplete: () => onComplete(groups[index]),
         ),
       );
     },
@@ -360,14 +444,20 @@ class _TicketGrid extends StatelessWidget {
 class _TicketCard extends StatelessWidget {
   const _TicketCard({
     required this.tickets,
-    required this.onDismiss,
     required this.iconName,
     required this.settings,
+    required this.isCrossed,
+    required this.onToggle,
+    required this.secondsRemaining,
+    required this.onComplete,
   });
   final List<KitchenTicket> tickets;
-  final VoidCallback onDismiss;
   final String iconName;
   final KdsSettings settings;
+  final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
+  final void Function(KitchenTicket ticket, int itemIndex) onToggle;
+  final int secondsRemaining;
+  final VoidCallback onComplete;
   @override
   Widget build(BuildContext context) {
     final ticket = tickets.first;
@@ -383,33 +473,61 @@ class _TicketCard extends StatelessWidget {
       color: const Color(0xFFFAFAFA),
       child: Column(
         children: [
-          Container(
-            height: 76,
-            padding: const EdgeInsets.only(left: 30, right: 10),
-            color: Colors.black,
-            child: Row(
+          SizedBox(
+            height: 52,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                Text(
-                  '#${ticket.orderNumber}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                  ),
+                const ColoredBox(color: Colors.black),
+                ClipPath(
+                  clipper: const SlantedTimerClipper(),
+                  child: ColoredBox(color: accent),
                 ),
-                const Spacer(),
-                Container(
-                  height: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 22),
-                  color: accent,
-                  alignment: Alignment.center,
-                  child: Text(
-                    _formatDuration(elapsed),
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontSize: 29,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.5,
+                if (secondsRemaining > 0)
+                  const ColoredBox(color: Color(0xFF007C58)),
+                Semantics(
+                  button: secondsRemaining == 0,
+                  label: secondsRemaining > 0
+                      ? 'Finished. Removing in $secondsRemaining seconds.'
+                      : 'Tap receipt header to mark this order finished.',
+                  child: InkWell(
+                    onTap: secondsRemaining == 0 ? onComplete : null,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      child: secondsRemaining > 0
+                          ? Center(
+                              child: Text(
+                                'FINISHED  00:${secondsRemaining.toString().padLeft(2, '0')}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            )
+                          : Row(
+                              children: [
+                                Text(
+                                  '#${ticket.orderNumber}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  _formatDuration(elapsed),
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                              ],
+                            ),
                     ),
                   ),
                 ),
@@ -417,22 +535,22 @@ class _TicketCard extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(30, 25, 20, 18),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(12, 12, 10, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
                       if (settings.showTypeIcons) ...[
-                        Icon(_orderTypeIcon(iconName), size: 26),
-                        const SizedBox(width: 10),
+                        Icon(_orderTypeIcon(iconName), size: 18),
+                        const SizedBox(width: 6),
                       ],
                       Expanded(
                         child: Text(
                           ticket.orderTypeName?.toUpperCase() ?? 'ORDER',
                           style: TextStyle(
-                            fontSize: settings.largeText ? 25 : 21,
+                            fontSize: settings.largeText ? 19 : 15,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -441,46 +559,36 @@ class _TicketCard extends StatelessWidget {
                         Text(
                           'Table $table',
                           style: const TextStyle(
-                            fontSize: 20,
+                            fontSize: 15,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                     ],
                   ),
-                  const Divider(height: 34, thickness: 1.5),
+                  const Divider(height: 22, thickness: 1),
                   if (ticket.displayOrderer case final orderer?)
                     Text('Ordered by: $orderer', style: _detailStyle),
                   if (ticket.orderFor case final orderFor?)
                     Text('Order for: $orderFor', style: _detailStyle),
                   if (ticket.displayRemarks case final remarks?)
                     Text('Remarks: $remarks', style: _detailStyle),
-                  const Divider(height: 28, thickness: 1.5),
-                  Expanded(
-                    child: _Items(
-                      tickets: tickets,
-                      largeText: settings.largeText,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _formatDate(ticket.enteredAt ?? ticket.createdAt),
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Color(0xFF52525B),
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: onDismiss,
-                        tooltip: 'Dismiss locally',
-                        icon: const Icon(Icons.close),
-                      ),
-                    ],
+                  const Divider(height: 18, thickness: 1),
+                  _Items(
+                    tickets: tickets,
+                    largeText: settings.largeText,
+                    isCrossed: isCrossed,
+                    onToggle: onToggle,
                   ),
                 ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+            child: Center(
+              child: Text(
+                _formatDate(ticket.enteredAt ?? ticket.createdAt),
+                style: const TextStyle(color: Color(0xFF52525B), fontSize: 11),
               ),
             ),
           ),
@@ -490,41 +598,77 @@ class _TicketCard extends StatelessWidget {
   }
 }
 
-const _detailStyle = TextStyle(color: Color(0xFF45454D), fontSize: 17);
+const _detailStyle = TextStyle(color: Color(0xFF45454D), fontSize: 12);
 
 class _Items extends StatelessWidget {
-  const _Items({required this.tickets, required this.largeText});
+  const _Items({
+    required this.tickets,
+    required this.largeText,
+    required this.isCrossed,
+    required this.onToggle,
+  });
   final List<KitchenTicket> tickets;
   final bool largeText;
+  final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
+  final void Function(KitchenTicket ticket, int itemIndex) onToggle;
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: EdgeInsets.zero,
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      for (final item in tickets.expand((ticket) => ticket.items)) ...[
-        Text(
-          '${item.displayQuantity}x  ${item.name}',
-          style: TextStyle(
-            fontSize: largeText ? 26 : 22,
-            fontWeight: FontWeight.w800,
+      for (final ticket in tickets)
+        for (
+          var itemIndex = 0;
+          itemIndex < ticket.items.length;
+          itemIndex++
+        ) ...[
+          Builder(
+            builder: (context) {
+              final item = ticket.items[itemIndex];
+              final crossed = isCrossed(ticket, itemIndex);
+              return Semantics(
+                button: true,
+                label: crossed
+                    ? '${item.name}, completed. Tap to restore.'
+                    : '${item.name}. Tap to cross out.',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(4),
+                  onTap: () => onToggle(ticket, itemIndex),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Text(
+                      '${item.displayQuantity}x  ${item.name}',
+                      style: TextStyle(
+                        fontSize: largeText ? 20 : 15,
+                        fontWeight: FontWeight.w800,
+                        color: crossed ? Colors.black45 : null,
+                        decoration: crossed ? TextDecoration.lineThrough : null,
+                        decorationThickness: crossed ? 2.5 : null,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
-        ),
-        if (item.variant case final variant? when variant.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(left: 45, top: 3),
-            child: Text(variant, style: _detailStyle),
-          ),
-        for (final modifier in item.modifiers)
-          Padding(
-            padding: const EdgeInsets.only(left: 45, top: 3),
-            child: Text('- $modifier', style: _detailStyle),
-          ),
-        if (item.comments case final comments? when comments.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(left: 45, top: 3),
-            child: Text(comments, style: _detailStyle),
-          ),
-        const SizedBox(height: 9),
-      ],
+          if (ticket.items[itemIndex].variant case final variant?
+              when variant.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 45, top: 3),
+              child: Text(variant, style: _detailStyle),
+            ),
+          for (final modifier in ticket.items[itemIndex].modifiers)
+            Padding(
+              padding: const EdgeInsets.only(left: 45, top: 3),
+              child: Text('- $modifier', style: _detailStyle),
+            ),
+          if (ticket.items[itemIndex].comments case final comments?
+              when comments.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 45, top: 3),
+              child: Text(comments, style: _detailStyle),
+            ),
+          const SizedBox(height: 5),
+        ],
     ],
   );
 }

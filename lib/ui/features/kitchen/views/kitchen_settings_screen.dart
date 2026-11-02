@@ -101,203 +101,238 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Display settings')),
-    body: ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        _Section(
-          title: 'Order types',
-          children: [
-            SwitchListTile(
-              title: const Text('Show Dine In'),
-              subtitle: const Text(
-                'Show Dine In filters and orders on this device.',
+  Widget build(BuildContext context) => Theme(
+    data: ThemeData(
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF00A8E8),
+        brightness: Brightness.dark,
+      ),
+      scaffoldBackgroundColor: const Color(0xFF06131F),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFF081B2B),
+        foregroundColor: Colors.white,
+      ),
+      cardTheme: CardThemeData(
+        color: const Color(0xFF10263A),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      inputDecorationTheme: const InputDecorationTheme(
+        filled: true,
+        fillColor: Color(0xFF081B2B),
+      ),
+    ),
+    child: Scaffold(
+      appBar: AppBar(title: const Text('Display settings')),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          _Section(
+            title: 'Order types',
+            children: [
+              SwitchListTile(
+                title: const Text('Show Dine In'),
+                subtitle: const Text(
+                  'Show Dine In filters and orders on this device.',
+                ),
+                value: _draft.showDineIn,
+                onChanged: (value) =>
+                    _update(_draft.copyWith(showDineIn: value)),
               ),
-              value: _draft.showDineIn,
-              onChanged: (value) => _update(_draft.copyWith(showDineIn: value)),
-            ),
-            SwitchListTile(
-              title: const Text('Show Takeaway'),
-              subtitle: const Text(
-                'Show Takeaway filters and orders on this device.',
+              SwitchListTile(
+                title: const Text('Show Takeaway'),
+                subtitle: const Text(
+                  'Show Takeaway filters and orders on this device.',
+                ),
+                value: _draft.showTakeaway,
+                onChanged: (value) =>
+                    _update(_draft.copyWith(showTakeaway: value)),
               ),
-              value: _draft.showTakeaway,
-              onChanged: (value) =>
-                  _update(_draft.copyWith(showTakeaway: value)),
-            ),
-            SwitchListTile(
-              title: const Text('Show order type icons'),
-              value: _draft.showTypeIcons,
-              onChanged: (value) =>
-                  _update(_draft.copyWith(showTypeIcons: value)),
-            ),
-            FutureBuilder<List<KdsOrderType>>(
-              future: _orderTypes,
-              builder: (context, snapshot) => Column(
-                children: [
-                  for (final type in snapshot.data ?? const <KdsOrderType>[])
-                    ListTile(
-                      title: Text('${type.name} icon'),
-                      trailing: DropdownButton<String>(
-                        value: type.icon,
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'restaurant',
-                            child: Icon(Icons.restaurant),
-                          ),
-                          DropdownMenuItem(
-                            value: 'table_restaurant',
-                            child: Icon(Icons.table_restaurant),
-                          ),
-                          DropdownMenuItem(
-                            value: 'takeout_dining',
-                            child: Icon(Icons.takeout_dining),
-                          ),
-                          DropdownMenuItem(
-                            value: 'delivery_dining',
-                            child: Icon(Icons.delivery_dining),
-                          ),
-                        ],
-                        onChanged: (icon) {
-                          if (icon != null) {
-                            widget.viewModel.updateOrderTypeIcon(type.id, icon);
-                          }
-                        },
+              SwitchListTile(
+                title: const Text('Show order type icons'),
+                value: _draft.showTypeIcons,
+                onChanged: (value) =>
+                    _update(_draft.copyWith(showTypeIcons: value)),
+              ),
+              FutureBuilder<List<KdsOrderType>>(
+                future: _orderTypes,
+                builder: (context, snapshot) => Column(
+                  children: [
+                    for (final type in snapshot.data ?? const <KdsOrderType>[])
+                      ListTile(
+                        title: Text('${type.name} icon'),
+                        trailing: DropdownButton<String>(
+                          value: type.icon,
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'restaurant',
+                              child: Icon(Icons.restaurant),
+                            ),
+                            DropdownMenuItem(
+                              value: 'table_restaurant',
+                              child: Icon(Icons.table_restaurant),
+                            ),
+                            DropdownMenuItem(
+                              value: 'takeout_dining',
+                              child: Icon(Icons.takeout_dining),
+                            ),
+                            DropdownMenuItem(
+                              value: 'delivery_dining',
+                              child: Icon(Icons.delivery_dining),
+                            ),
+                          ],
+                          onChanged: (icon) {
+                            if (icon != null) {
+                              widget.viewModel.updateOrderTypeIcon(
+                                type.id,
+                                icon,
+                              );
+                            }
+                          },
+                        ),
                       ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          _Section(
+            title: 'Order timer',
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _minutesField(
+                      _warningController,
+                      'Yellow starts at',
                     ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _minutesField(_urgentController, 'Red starts at'),
+                  ),
                 ],
               ),
-            ),
-          ],
-        ),
-        _Section(
-          title: 'Order timer',
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _minutesField(_warningController, 'Yellow starts at'),
+              const SizedBox(height: 12),
+              const Text('Yellow must be greater than 0 and lower than red.'),
+              const SizedBox(height: 16),
+              const _TimerPreview(),
+            ],
+          ),
+          _Section(
+            title: 'Sound & notifications',
+            children: [
+              SwitchListTile(
+                title: const Text('New-order alert'),
+                subtitle: const Text(
+                  'Stored preference; system sound support depends on the device.',
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _minutesField(_urgentController, 'Red starts at'),
+                value: _draft.newOrderAlert,
+                onChanged: (value) =>
+                    _update(_draft.copyWith(newOrderAlert: value)),
+              ),
+              SwitchListTile(
+                title: const Text('Urgent-order alert'),
+                value: _draft.urgentOrderAlert,
+                onChanged: (value) =>
+                    _update(_draft.copyWith(urgentOrderAlert: value)),
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () => SystemSound.play(SystemSoundType.click),
+                  icon: const Icon(Icons.volume_up_outlined),
+                  label: const Text('Test system sound'),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Text('Yellow must be greater than 0 and lower than red.'),
-            const SizedBox(height: 16),
-            const _TimerPreview(),
-          ],
-        ),
-        _Section(
-          title: 'Sound & notifications',
-          children: [
-            SwitchListTile(
-              title: const Text('New-order alert'),
-              subtitle: const Text(
-                'Stored preference; system sound support depends on the device.',
               ),
-              value: _draft.newOrderAlert,
-              onChanged: (value) =>
-                  _update(_draft.copyWith(newOrderAlert: value)),
-            ),
-            SwitchListTile(
-              title: const Text('Urgent-order alert'),
-              value: _draft.urgentOrderAlert,
-              onChanged: (value) =>
-                  _update(_draft.copyWith(urgentOrderAlert: value)),
-            ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: () => SystemSound.play(SystemSoundType.click),
-                icon: const Icon(Icons.volume_up_outlined),
-                label: const Text('Test system sound'),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _changeConnection,
+                  icon: const Icon(Icons.edit_location_alt_outlined),
+                  label: const Text('Change POS connection'),
+                ),
               ),
-            ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: _changeConnection,
-                icon: const Icon(Icons.edit_location_alt_outlined),
-                label: const Text('Change POS connection'),
+            ],
+          ),
+          _Section(
+            title: 'Display',
+            children: [
+              SwitchListTile(
+                title: const Text('Large receipt text'),
+                value: _draft.largeText,
+                onChanged: (value) =>
+                    _update(_draft.copyWith(largeText: value)),
               ),
-            ),
-          ],
-        ),
-        _Section(
-          title: 'Display',
-          children: [
-            SwitchListTile(
-              title: const Text('Large receipt text'),
-              value: _draft.largeText,
-              onChanged: (value) => _update(_draft.copyWith(largeText: value)),
-            ),
-            SwitchListTile(
-              title: const Text('Compact cards'),
-              value: _draft.compactCards,
-              onChanged: (value) =>
-                  _update(_draft.copyWith(compactCards: value)),
-            ),
-            SwitchListTile(
-              title: const Text('Newest orders first'),
-              value: _draft.newestFirst,
-              onChanged: (value) =>
-                  _update(_draft.copyWith(newestFirst: value)),
-            ),
-          ],
-        ),
-        _Section(
-          title: 'Connection',
-          children: [
-            ListTile(
-              leading: Icon(
-                widget.viewModel.isPaired ? Icons.cloud_done : Icons.cloud_off,
+              SwitchListTile(
+                title: const Text('Compact cards'),
+                value: _draft.compactCards,
+                onChanged: (value) =>
+                    _update(_draft.copyWith(compactCards: value)),
               ),
-              title: Text(
-                widget.viewModel.isPaired
-                    ? 'Connected to POS'
-                    : 'Reconnecting to POS',
+              SwitchListTile(
+                title: const Text('Newest orders first'),
+                value: _draft.newestFirst,
+                onChanged: (value) =>
+                    _update(_draft.copyWith(newestFirst: value)),
               ),
-              subtitle: Text('POS: ${widget.session.posIp}'),
-            ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  await widget.viewModel.start(widget.session);
-                  if (mounted) _message('Reconnect requested.');
-                },
-                icon: const Icon(Icons.refresh),
-                label: const Text('Reconnect'),
+            ],
+          ),
+          _Section(
+            title: 'Connection',
+            children: [
+              ListTile(
+                leading: Icon(
+                  widget.viewModel.isPaired
+                      ? Icons.cloud_done
+                      : Icons.cloud_off,
+                ),
+                title: Text(
+                  widget.viewModel.isPaired
+                      ? 'Connected to POS'
+                      : 'Reconnecting to POS',
+                ),
+                subtitle: Text('POS: ${widget.session.posIp}'),
               ),
-            ),
-          ],
-        ),
-        _Section(
-          title: 'About this display',
-          children: [
-            ListTile(
-              title: const Text('Display name'),
-              subtitle: Text(widget.session.displayName),
-            ),
-            ListTile(
-              title: const Text('Display ID'),
-              subtitle: Text(widget.session.displayId),
-            ),
-            const ListTile(title: Text('App version'), subtitle: Text('1.0.0')),
-          ],
-        ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: _save,
-          icon: const Icon(Icons.save),
-          label: const Text('Save changes'),
-        ),
-        const SizedBox(height: 24),
-      ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    await widget.viewModel.start(widget.session);
+                    if (mounted) _message('Reconnect requested.');
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Reconnect'),
+                ),
+              ),
+            ],
+          ),
+          _Section(
+            title: 'About this display',
+            children: [
+              ListTile(
+                title: const Text('Display name'),
+                subtitle: Text(widget.session.displayName),
+              ),
+              ListTile(
+                title: const Text('Display ID'),
+                subtitle: Text(widget.session.displayId),
+              ),
+              const ListTile(
+                title: Text('App version'),
+                subtitle: Text('1.0.0'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: _save,
+            icon: const Icon(Icons.save),
+            label: const Text('Save changes'),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
     ),
   );
 

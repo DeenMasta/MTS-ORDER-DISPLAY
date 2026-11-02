@@ -16,6 +16,7 @@ void main() {
       _ticket('2', 'Takeaway'),
       _ticket('3', 'Dine In'),
       _ticket('4', 'Dine In'),
+      _ticket('5', 'Dine In'),
     ]);
     final viewModel = KitchenBoardViewModel(
       repository: repository,
@@ -32,6 +33,26 @@ void main() {
     viewModel.selectFilter(KitchenOrderFilter.takeaway);
 
     expect(viewModel.page, 0);
+    expect(viewModel.ticketGroups, hasLength(1));
+    expect(viewModel.ticketGroups.single.first.orderNumber, '2');
+  });
+
+  test('shows every active order type as a dashboard filter', () async {
+    final viewModel = KitchenBoardViewModel(
+      repository: _FakeKitchenRepository([
+        _ticket('1', 'Dine In'),
+        _ticket('2', 'Delivery'),
+      ]),
+      settingsRepository: _FakeSettingsRepository(),
+    );
+    addTearDown(viewModel.dispose);
+
+    await viewModel.start(_session);
+    final delivery = viewModel.availableFilters.firstWhere(
+      (filter) => filter.label == 'Delivery',
+    );
+    viewModel.selectFilter(delivery);
+
     expect(viewModel.ticketGroups, hasLength(1));
     expect(viewModel.ticketGroups.single.first.orderNumber, '2');
   });
@@ -71,6 +92,58 @@ void main() {
       throwsA(isA<FormatException>()),
     );
   });
+
+  test('crosses an item locally without writing to the repository', () {
+    final ticket = KitchenTicket(
+      messageId: 'message-1',
+      saleId: 'sale-1',
+      departmentId: 'kitchen',
+      revision: 1,
+      action: 'upsert',
+      orderNumber: '1',
+      createdAt: DateTime(2026),
+      items: const [KitchenTicketItem(name: 'Nasi goreng', quantity: 1)],
+    );
+    final repository = _FakeKitchenRepository([ticket]);
+    final viewModel = KitchenBoardViewModel(
+      repository: repository,
+      settingsRepository: _FakeSettingsRepository(),
+    );
+    addTearDown(viewModel.dispose);
+
+    viewModel.toggleItemCrossed(ticket, 0);
+
+    expect(viewModel.isItemCrossed(ticket, 0), isTrue);
+    expect(repository.dismissCalls, isZero);
+
+    viewModel.toggleItemCrossed(ticket, 0);
+
+    expect(viewModel.isItemCrossed(ticket, 0), isFalse);
+    expect(repository.dismissCalls, isZero);
+  });
+
+  test(
+    'finishes a receipt locally without writing to the repository',
+    () async {
+      final ticket = _ticket('1', 'Dine In');
+      final repository = _FakeKitchenRepository([ticket]);
+      final viewModel = KitchenBoardViewModel(
+        repository: repository,
+        settingsRepository: _FakeSettingsRepository(),
+      );
+      addTearDown(viewModel.dispose);
+
+      await viewModel.start(_session);
+      viewModel.completeLocally([ticket]);
+
+      expect(
+        viewModel.completionSecondsRemaining([ticket]),
+        inInclusiveRange(1, 10),
+      );
+      expect(viewModel.ticketGroups, hasLength(1));
+      expect(repository.dismissCalls, isZero);
+    },
+  );
 }
 
 class _FakeSettingsRepository implements DisplaySettingsRepository {
@@ -103,6 +176,7 @@ class _FakeKitchenRepository implements KitchenRepository {
   _FakeKitchenRepository(this._tickets);
   final List<KitchenTicket> _tickets;
   final _changes = StreamController<void>.broadcast();
+  int dismissCalls = 0;
 
   @override
   Stream<void> get changes => _changes.stream;
@@ -115,8 +189,12 @@ class _FakeKitchenRepository implements KitchenRepository {
   Stream<PairingConnectionState> get pairingStates => const Stream.empty();
 
   @override
-  Future<List<KitchenTicket>> dismiss(String ticketId) async =>
-      _tickets.where((ticket) => ticket.id != ticketId).toList(growable: false);
+  Future<List<KitchenTicket>> dismiss(String ticketId) async {
+    dismissCalls++;
+    return _tickets
+        .where((ticket) => ticket.id != ticketId)
+        .toList(growable: false);
+  }
 
   @override
   Future<List<KdsOrderType>> orderTypes() async => const [];
