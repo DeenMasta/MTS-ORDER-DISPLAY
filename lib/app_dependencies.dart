@@ -1,8 +1,10 @@
 import 'data/repositories/device_identity_repository.dart';
+import 'data/repositories/display_settings_repository.dart';
 import 'data/repositories/display_session_repository.dart';
 import 'data/repositories/kitchen_repository.dart';
 import 'data/repositories/pairing_repository.dart';
 import 'data/services/app_database.dart';
+import 'data/services/display_settings_store.dart';
 import 'data/services/pos_connection_service.dart';
 import 'data/services/secure_session_storage.dart';
 import 'data/services/ticket_store.dart';
@@ -30,6 +32,9 @@ class AppDependencies {
         pairingRepository: pairingRepository,
         deviceIdentityRepository: deviceIdentityRepository,
         store: TicketStore(openDatabase: AppDatabase.open),
+      ),
+      settingsRepository: StoredDisplaySettingsRepository(
+        store: DisplaySettingsStore(openDatabase: AppDatabase.open),
       ),
     );
   }

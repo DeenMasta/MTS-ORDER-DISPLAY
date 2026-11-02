@@ -78,7 +78,8 @@ class FakePairingRepository implements PairingRepository {
   bool get isPaired => false;
 
   @override
-  PairingConnectionState get state => const PairingConnectionState(isPaired: false);
+  PairingConnectionState get state =>
+      const PairingConnectionState(isPaired: false);
 
   @override
   Stream<PairingConnectionState> get states => Stream.empty();
@@ -117,7 +118,8 @@ class PendingPairingRepository implements PairingRepository {
   bool get isPaired => false;
 
   @override
-  PairingConnectionState get state => const PairingConnectionState(isPaired: false);
+  PairingConnectionState get state =>
+      const PairingConnectionState(isPaired: false);
 
   @override
   Stream<PairingConnectionState> get states => Stream.empty();

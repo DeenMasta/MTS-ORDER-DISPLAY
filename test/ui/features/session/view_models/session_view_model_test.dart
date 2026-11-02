@@ -20,15 +20,37 @@ void main() {
     expect(viewModel.status, SessionStatus.paired);
     expect(viewModel.session?.displayId, 'display-1');
   });
+
+  test('clears the saved session when changing POS connection', () async {
+    final repository = FakeDisplaySessionRepository(
+      session: const DisplaySession(
+        displayId: 'display-1',
+        posIp: '192.168.1.10',
+        displayName: 'Main Kitchen',
+      ),
+    );
+    final viewModel = SessionViewModel(sessionRepository: repository);
+
+    await viewModel.initialize();
+    await viewModel.changeConnection();
+
+    expect(repository.wasCleared, isTrue);
+    expect(viewModel.session, isNull);
+    expect(viewModel.status, SessionStatus.unpaired);
+  });
 }
 
 class FakeDisplaySessionRepository implements DisplaySessionRepository {
   FakeDisplaySessionRepository({this.session});
 
-  final DisplaySession? session;
+  DisplaySession? session;
+  bool wasCleared = false;
 
   @override
-  Future<void> clear() async {}
+  Future<void> clear() async {
+    wasCleared = true;
+    session = null;
+  }
 
   @override
   Future<DisplaySession?> load() async => session;

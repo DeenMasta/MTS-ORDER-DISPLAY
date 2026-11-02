@@ -22,7 +22,8 @@ abstract interface class PairingRepository {
 }
 
 class LanPairingRepository implements PairingRepository {
-  LanPairingRepository({required PosConnection connection}) : _connection = connection;
+  LanPairingRepository({required PosConnection connection})
+    : _connection = connection;
 
   final PosConnection _connection;
   final _states = StreamController<PairingConnectionState>.broadcast();
@@ -101,7 +102,8 @@ class LanPairingRepository implements PairingRepository {
     _installationId = installationId;
   }
 
-  Uri get _endpoint => Uri(scheme: 'ws', host: _posIp!, port: 8080, path: '/kds');
+  Uri get _endpoint =>
+      Uri(scheme: 'ws', host: _posIp!, port: 8080, path: '/kds');
 
   void _sendChallenge() {
     final displayName = _displayName;

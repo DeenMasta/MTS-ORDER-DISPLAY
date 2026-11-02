@@ -21,11 +21,20 @@ class SessionViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       _session = await _sessionRepository.load();
-      _status = _session == null ? SessionStatus.unpaired : SessionStatus.paired;
+      _status = _session == null
+          ? SessionStatus.unpaired
+          : SessionStatus.paired;
     } catch (_) {
       _session = null;
       _status = SessionStatus.error;
     }
+    notifyListeners();
+  }
+
+  Future<void> changeConnection() async {
+    await _sessionRepository.clear();
+    _session = null;
+    _status = SessionStatus.unpaired;
     notifyListeners();
   }
 }
