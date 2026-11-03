@@ -38,7 +38,7 @@ void main() {
     await viewModel.initialize();
     await tester.pump();
 
-    expect(find.text('Pair kitchen display'), findsOneWidget);
+    expect(find.text('Set up your kitchen display'), findsOneWidget);
   });
 }
 
