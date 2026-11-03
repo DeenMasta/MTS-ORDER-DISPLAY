@@ -31,6 +31,34 @@ void main() {
       expect(pairingRepository.cancelCalls, 0);
     },
   );
+
+  testWidgets('shows the POS approval step while pairing is pending', (
+    tester,
+  ) async {
+    final pairingRepository = PendingPairingRepository();
+    final viewModel = PairingViewModel(
+      pairingRepository: pairingRepository,
+      deviceIdentityRepository: FixedDeviceIdentityRepository(),
+      sessionRepository: MemoryDisplaySessionRepository(),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PairingScreen(viewModel: viewModel, onPaired: () async {}),
+      ),
+    );
+
+    await tester.enterText(find.byType(TextField).first, '192.168.1.10');
+    await tester.ensureVisible(find.text('Pair display'));
+    await tester.tap(find.text('Pair display'));
+    await tester.pump();
+
+    expect(find.text('Confirm pairing'), findsOneWidget);
+    expect(find.text('Cancel pairing'), findsOneWidget);
+
+    pairingRepository.complete();
+    await tester.pump();
+  });
 }
 
 class TrackingPairingRepository implements PairingRepository {
@@ -64,6 +92,25 @@ class TrackingPairingRepository implements PairingRepository {
     required DisplaySession session,
     required String installationId,
   }) async {}
+}
+
+class PendingPairingRepository extends TrackingPairingRepository {
+  final _result = Completer<DisplaySession>();
+
+  @override
+  Future<DisplaySession> pair({
+    required String posIp,
+    required String displayName,
+    required String installationId,
+  }) => _result.future;
+
+  void complete() => _result.complete(
+    const DisplaySession(
+      displayId: 'display-1',
+      posIp: '192.168.1.10',
+      displayName: 'Kitchen Display',
+    ),
+  );
 }
 
 class FixedDeviceIdentityRepository implements DeviceIdentityRepository {
