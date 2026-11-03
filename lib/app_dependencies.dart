@@ -5,6 +5,7 @@ import 'data/repositories/kitchen_repository.dart';
 import 'data/repositories/pairing_repository.dart';
 import 'data/services/app_database.dart';
 import 'data/services/display_settings_store.dart';
+import 'data/services/kitchen_alert_player.dart';
 import 'data/services/pos_connection_service.dart';
 import 'data/services/secure_session_storage.dart';
 import 'data/services/ticket_store.dart';
@@ -36,6 +37,7 @@ class AppDependencies {
       settingsRepository: StoredDisplaySettingsRepository(
         store: DisplaySettingsStore(openDatabase: AppDatabase.open),
       ),
+      alertPlayer: const SystemKitchenAlertPlayer(),
     );
   }
 

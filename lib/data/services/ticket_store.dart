@@ -28,6 +28,32 @@ class TicketStore {
         .toList(growable: false);
   }
 
+  /// Returns the receipts marked Finished on the supplied local calendar day.
+  ///
+  /// Old receipts remain in SQLite; the day range only controls what is shown
+  /// in the KDS history view.
+  Future<List<KitchenTicket>> historyTicketsForDay(DateTime day) async {
+    final localStart = DateTime(day.year, day.month, day.day);
+    final localEnd = localStart.add(const Duration(days: 1));
+    final rows = await (await _db).database.query(
+      'tickets',
+      where: 'status = ? AND updated_at >= ? AND updated_at < ?',
+      whereArgs: [
+        'dismissed',
+        localStart.toUtc().toIso8601String(),
+        localEnd.toUtc().toIso8601String(),
+      ],
+      orderBy: 'updated_at DESC',
+    );
+    return rows
+        .map(
+          (row) => KitchenTicket.fromJson(
+            jsonDecode(row['payload_json']! as String) as Map<String, dynamic>,
+          ),
+        )
+        .toList(growable: false);
+  }
+
   Future<void> receive(KitchenTicket ticket) async {
     final database = (await _db).database;
     await database.transaction((transaction) async {
@@ -90,12 +116,35 @@ class TicketStore {
   }
 
   Future<void> dismiss(String ticketId) async {
-    await (await _db).database.update(
-      'tickets',
-      {'status': 'dismissed'},
-      where: 'id = ?',
-      whereArgs: [ticketId],
-    );
+    await markFinished([ticketId]);
+  }
+
+  /// Updates only this display's local ticket status; it never contacts POS.
+  Future<void> markFinished(Iterable<String> ticketIds) =>
+      _setTicketStatus(ticketIds, status: 'dismissed');
+
+  /// Restores a receipt during its short Finished countdown.
+  Future<void> restoreFinished(Iterable<String> ticketIds) =>
+      _setTicketStatus(ticketIds, status: 'active');
+
+  Future<void> _setTicketStatus(
+    Iterable<String> ticketIds, {
+    required String status,
+  }) async {
+    final ids = ticketIds.where((id) => id.isNotEmpty).toSet();
+    if (ids.isEmpty) return;
+    final database = (await _db).database;
+    final updatedAt = DateTime.now().toUtc().toIso8601String();
+    await database.transaction((transaction) async {
+      for (final id in ids) {
+        await transaction.update(
+          'tickets',
+          {'status': status, 'updated_at': updatedAt},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+      }
+    });
   }
 
   Future<AppDatabase> get _db => _database ??= _openDatabase();

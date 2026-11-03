@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../../domain/models/display_session.dart';
 import '../../../../domain/models/kds_settings.dart';
 import '../../../../domain/models/kitchen_ticket.dart';
+import '../../../core/order_type_icon_library.dart';
 import '../view_models/kitchen_board_view_model.dart';
 
 class KitchenSettingsScreen extends StatefulWidget {
@@ -26,7 +27,8 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
   late KdsSettings _draft;
   late final TextEditingController _warningController;
   late final TextEditingController _urgentController;
-  late final Future<List<KdsOrderType>> _orderTypes;
+  List<KdsOrderType> _orderTypes = const [];
+  bool _loadingOrderTypes = true;
 
   @override
   void initState() {
@@ -38,7 +40,7 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
     _urgentController = TextEditingController(
       text: _draft.urgentMinutes.toString(),
     );
-    _orderTypes = widget.viewModel.orderTypes();
+    _loadOrderTypes();
   }
 
   @override
@@ -74,6 +76,106 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
 
   void _update(KdsSettings value) => setState(() => _draft = value);
 
+  void _setOrderTypeVisibility(KdsOrderType type, bool visible) => _update(
+    _draft.withOrderTypeVisibility(
+      id: type.id,
+      name: type.name,
+      visible: visible,
+    ),
+  );
+
+  Future<void> _loadOrderTypes() async {
+    final orderTypes = await widget.viewModel.orderTypes();
+    if (!mounted) return;
+    setState(() {
+      _orderTypes = orderTypes;
+      _loadingOrderTypes = false;
+    });
+  }
+
+  Future<void> _selectOrderTypeIcon(KdsOrderType type) async {
+    final icon = await _showOrderTypeIconPicker(type);
+    if (icon == null || icon == type.icon) return;
+
+    await widget.viewModel.updateOrderTypeIcon(type.id, icon);
+    if (!mounted) return;
+    setState(() {
+      _orderTypes = _orderTypes
+          .map(
+            (orderType) => orderType.id == type.id
+                ? KdsOrderType(
+                    id: orderType.id,
+                    name: orderType.name,
+                    icon: icon,
+                  )
+                : orderType,
+          )
+          .toList(growable: false);
+    });
+  }
+
+  Future<String?> _showOrderTypeIconPicker(KdsOrderType type) =>
+      showModalBottomSheet<String>(
+        context: context,
+        backgroundColor: const Color(0xFF081827),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (context) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Choose an icon for ${type.name}',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'This icon is used on the receipt and dashboard.',
+                    style: TextStyle(color: Color(0xFFA8C6D6)),
+                  ),
+                  const SizedBox(height: 20),
+                  for (final category in const [
+                    'Food & beverage',
+                    'Retail',
+                    'Service',
+                  ]) ...[
+                    Text(
+                      category,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: const Color(0xFF43C9F5),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final option in orderTypeIconLibrary.where(
+                          (option) => option.category == category,
+                        ))
+                          _OrderTypeIconChoice(
+                            option: option,
+                            selected: option.name == type.icon,
+                            onTap: () => Navigator.pop(context, option.name),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
   Future<void> _changeConnection() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -104,22 +206,25 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
   Widget build(BuildContext context) => Theme(
     data: ThemeData(
       colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF00A8E8),
+        seedColor: const Color(0xFF58D0BF),
         brightness: Brightness.dark,
       ),
-      scaffoldBackgroundColor: const Color(0xFF06131F),
+      scaffoldBackgroundColor: const Color(0xFF060B10),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF081B2B),
+        backgroundColor: Color(0xFF0B1219),
         foregroundColor: Colors.white,
       ),
       cardTheme: CardThemeData(
-        color: const Color(0xFF10263A),
+        color: const Color(0xFF0D171E),
         surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFF28434A)),
+        ),
       ),
       inputDecorationTheme: const InputDecorationTheme(
         filled: true,
-        fillColor: Color(0xFF081B2B),
+        fillColor: Color(0xFF090F15),
       ),
     ),
     child: Scaffold(
@@ -130,23 +235,11 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
           _Section(
             title: 'Order types',
             children: [
-              SwitchListTile(
-                title: const Text('Show Dine In'),
-                subtitle: const Text(
-                  'Show Dine In filters and orders on this device.',
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
+                child: Text(
+                  'Choose which order types appear on this display. Changes apply after Save changes.',
                 ),
-                value: _draft.showDineIn,
-                onChanged: (value) =>
-                    _update(_draft.copyWith(showDineIn: value)),
-              ),
-              SwitchListTile(
-                title: const Text('Show Takeaway'),
-                subtitle: const Text(
-                  'Show Takeaway filters and orders on this device.',
-                ),
-                value: _draft.showTakeaway,
-                onChanged: (value) =>
-                    _update(_draft.copyWith(showTakeaway: value)),
               ),
               SwitchListTile(
                 title: const Text('Show order type icons'),
@@ -154,64 +247,78 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                 onChanged: (value) =>
                     _update(_draft.copyWith(showTypeIcons: value)),
               ),
-              FutureBuilder<List<KdsOrderType>>(
-                future: _orderTypes,
-                builder: (context, snapshot) => Column(
-                  children: [
-                    for (final type in snapshot.data ?? const <KdsOrderType>[])
-                      ListTile(
-                        title: Text('${type.name} icon'),
-                        trailing: DropdownButton<String>(
-                          value: type.icon,
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'restaurant',
-                              child: Icon(Icons.restaurant),
-                            ),
-                            DropdownMenuItem(
-                              value: 'table_restaurant',
-                              child: Icon(Icons.table_restaurant),
-                            ),
-                            DropdownMenuItem(
-                              value: 'takeout_dining',
-                              child: Icon(Icons.takeout_dining),
-                            ),
-                            DropdownMenuItem(
-                              value: 'delivery_dining',
-                              child: Icon(Icons.delivery_dining),
-                            ),
-                          ],
-                          onChanged: (icon) {
-                            if (icon != null) {
-                              widget.viewModel.updateOrderTypeIcon(
-                                type.id,
-                                icon,
-                              );
-                            }
-                          },
+              if (_loadingOrderTypes)
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_orderTypes.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'No order types have been received from the POS.',
+                  ),
+                )
+              else
+                for (final type in _orderTypes)
+                  ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    leading: CircleAvatar(
+                      backgroundColor: const Color(0xFF123A52),
+                      foregroundColor: const Color(0xFF49CCF4),
+                      child: Icon(orderTypeIconFor(type.icon)),
+                    ),
+                    title: Text(type.name),
+                    subtitle: Text(
+                      '${_draft.isOrderTypeVisible(id: type.id, name: type.name) ? 'Shown on dashboard' : 'Hidden from dashboard'} • Icon: ${orderTypeIconOptionFor(type.icon).label}',
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Switch(
+                          value: _draft.isOrderTypeVisible(
+                            id: type.id,
+                            name: type.name,
+                          ),
+                          onChanged: (visible) =>
+                              _setOrderTypeVisibility(type, visible),
                         ),
-                      ),
-                  ],
-                ),
-              ),
+                        const Icon(Icons.chevron_right_rounded),
+                      ],
+                    ),
+                    onTap: () => _selectOrderTypeIcon(type),
+                  ),
             ],
           ),
           _Section(
             title: 'Order timer',
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _minutesField(
-                      _warningController,
-                      'Yellow starts at',
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _minutesField(_urgentController, 'Red starts at'),
-                  ),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) => constraints.maxWidth < 360
+                    ? Column(
+                        children: [
+                          _minutesField(_warningController, 'Yellow starts at'),
+                          const SizedBox(height: 12),
+                          _minutesField(_urgentController, 'Red starts at'),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: _minutesField(
+                              _warningController,
+                              'Yellow starts at',
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _minutesField(
+                              _urgentController,
+                              'Red starts at',
+                            ),
+                          ),
+                        ],
+                      ),
               ),
               const SizedBox(height: 12),
               const Text('Yellow must be greater than 0 and lower than red.'),
@@ -225,53 +332,117 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
               SwitchListTile(
                 title: const Text('New-order alert'),
                 subtitle: const Text(
-                  'Stored preference; system sound support depends on the device.',
+                  'Play once when a new order first reaches this display.',
                 ),
                 value: _draft.newOrderAlert,
                 onChanged: (value) =>
                     _update(_draft.copyWith(newOrderAlert: value)),
               ),
+              ListTile(
+                enabled: _draft.newOrderAlert,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                leading: const Icon(Icons.notifications_active_outlined),
+                title: const Text('New-order tone'),
+                subtitle: const Text('Choose the sound for incoming orders.'),
+                trailing: DropdownButton<KdsAlertTone>(
+                  value: _draft.newOrderTone,
+                  items: [
+                    for (final tone in KdsAlertTone.values)
+                      DropdownMenuItem(value: tone, child: Text(tone.label)),
+                  ],
+                  onChanged: !_draft.newOrderAlert
+                      ? null
+                      : (tone) {
+                          if (tone != null) {
+                            _update(_draft.copyWith(newOrderTone: tone));
+                          }
+                        },
+                ),
+              ),
               SwitchListTile(
                 title: const Text('Urgent-order alert'),
+                subtitle: const Text(
+                  'Play once when an active order reaches the red timer.',
+                ),
                 value: _draft.urgentOrderAlert,
                 onChanged: (value) =>
                     _update(_draft.copyWith(urgentOrderAlert: value)),
               ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  onPressed: () => SystemSound.play(SystemSoundType.click),
-                  icon: const Icon(Icons.volume_up_outlined),
-                  label: const Text('Test system sound'),
+              ListTile(
+                enabled: _draft.urgentOrderAlert,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                leading: const Icon(Icons.crisis_alert_outlined),
+                title: const Text('Urgent-order tone'),
+                subtitle: const Text('Choose the sound for red-timer orders.'),
+                trailing: DropdownButton<KdsAlertTone>(
+                  value: _draft.urgentOrderTone,
+                  items: [
+                    for (final tone in KdsAlertTone.values)
+                      DropdownMenuItem(value: tone, child: Text(tone.label)),
+                  ],
+                  onChanged: !_draft.urgentOrderAlert
+                      ? null
+                      : (tone) {
+                          if (tone != null) {
+                            _update(_draft.copyWith(urgentOrderTone: tone));
+                          }
+                        },
                 ),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
+                child: Text('Alert loudness follows the device sound level.'),
               ),
               Align(
                 alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  onPressed: _changeConnection,
-                  icon: const Icon(Icons.edit_location_alt_outlined),
-                  label: const Text('Change POS connection'),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () =>
+                          widget.viewModel.testAlertTone(_draft.newOrderTone),
+                      icon: const Icon(Icons.volume_up_outlined),
+                      label: const Text('Test new-order tone'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => widget.viewModel.testAlertTone(
+                        _draft.urgentOrderTone,
+                      ),
+                      icon: const Icon(Icons.warning_amber_rounded),
+                      label: const Text('Test urgent tone'),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
           _Section(
-            title: 'Display',
+            title: 'Dashboard layout',
             children: [
               SwitchListTile(
                 title: const Text('Large receipt text'),
+                subtitle: const Text(
+                  'Make order items easier to read at a distance.',
+                ),
                 value: _draft.largeText,
                 onChanged: (value) =>
                     _update(_draft.copyWith(largeText: value)),
               ),
               SwitchListTile(
-                title: const Text('Compact cards'),
+                title: const Text('Compact receipt cards'),
+                subtitle: const Text(
+                  'Fit more order information in each card.',
+                ),
                 value: _draft.compactCards,
                 onChanged: (value) =>
                     _update(_draft.copyWith(compactCards: value)),
               ),
               SwitchListTile(
                 title: const Text('Newest orders first'),
+                subtitle: const Text(
+                  'Off keeps the oldest orders at the front.',
+                ),
                 value: _draft.newestFirst,
                 onChanged: (value) =>
                     _update(_draft.copyWith(newestFirst: value)),
@@ -303,6 +474,14 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                   },
                   icon: const Icon(Icons.refresh),
                   label: const Text('Reconnect'),
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _changeConnection,
+                  icon: const Icon(Icons.edit_location_alt_outlined),
+                  label: const Text('Change POS connection'),
                 ),
               ),
             ],
@@ -364,6 +543,64 @@ class _Section extends StatelessWidget {
           const SizedBox(height: 8),
           ...children,
         ],
+      ),
+    ),
+  );
+}
+
+class _OrderTypeIconChoice extends StatelessWidget {
+  const _OrderTypeIconChoice({
+    required this.option,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final OrderTypeIconOption option;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    selected: selected,
+    label: option.label,
+    child: Material(
+      color: selected ? const Color(0xFF0D526D) : const Color(0xFF10283A),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          width: 104,
+          height: 86,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  option.icon,
+                  color: selected
+                      ? const Color(0xFF69DCF9)
+                      : const Color(0xFFD6E9F0),
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  option.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: selected
+                        ? const Color(0xFF69DCF9)
+                        : const Color(0xFFD6E9F0),
+                    fontSize: 11,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     ),
   );

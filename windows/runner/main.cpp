@@ -26,7 +26,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
 
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
-  Win32Window::Size size(1280, 720);
+  // Do not launch wider or taller than the usable desktop. On small displays,
+  // a fixed 1280x720 window is clipped instead of resized by Windows.
+  RECT work_area{};
+  SystemParametersInfoW(SPI_GETWORKAREA, 0, &work_area, 0);
+  const int available_width = work_area.right - work_area.left - 20;
+  const int available_height = work_area.bottom - work_area.top - 20;
+  const int width = available_width < 1280 ? available_width : 1280;
+  const int height = available_height < 720 ? available_height : 720;
+  Win32Window::Size size(width, height);
   if (!window.Create(L"Mysztech Order Display", origin, size)) {
     return EXIT_FAILURE;
   }

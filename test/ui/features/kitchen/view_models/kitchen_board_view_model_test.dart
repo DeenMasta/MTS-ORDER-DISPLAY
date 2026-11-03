@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mysztech_order_display/data/repositories/kitchen_repository.dart';
 import 'package:mysztech_order_display/data/repositories/display_settings_repository.dart';
+import 'package:mysztech_order_display/data/services/kitchen_alert_player.dart';
 import 'package:mysztech_order_display/domain/models/display_session.dart';
 import 'package:mysztech_order_display/domain/models/kds_settings.dart';
 import 'package:mysztech_order_display/domain/models/kitchen_ticket.dart';
@@ -37,6 +38,25 @@ void main() {
     expect(viewModel.ticketGroups.single.first.orderNumber, '2');
   });
 
+  test('updates the number of receipts per page for compact layouts', () async {
+    final viewModel = KitchenBoardViewModel(
+      repository: _FakeKitchenRepository([
+        _ticket('1', 'Dine In'),
+        _ticket('2', 'Dine In'),
+        _ticket('3', 'Dine In'),
+      ]),
+      settingsRepository: _FakeSettingsRepository(),
+    );
+    addTearDown(viewModel.dispose);
+
+    await viewModel.start(_session);
+    viewModel.setReceiptsPerPage(1);
+
+    expect(viewModel.pageCount, 3);
+    expect(viewModel.visibleTicketGroups, hasLength(1));
+    expect(viewModel.visibleTicketGroups.single.first.orderNumber, '1');
+  });
+
   test('shows every active order type as a dashboard filter', () async {
     final viewModel = KitchenBoardViewModel(
       repository: _FakeKitchenRepository([
@@ -56,6 +76,56 @@ void main() {
     expect(viewModel.ticketGroups, hasLength(1));
     expect(viewModel.ticketGroups.single.first.orderNumber, '2');
   });
+
+  test(
+    'shows configured order types as dashboard filters without orders',
+    () async {
+      final viewModel = KitchenBoardViewModel(
+        repository: _FakeKitchenRepository(
+          const [],
+          configuredOrderTypes: const [
+            KdsOrderType(id: 'grab', name: 'Grab', icon: 'delivery_dining'),
+            KdsOrderType(id: 'retail', name: 'Retail', icon: 'store'),
+          ],
+        ),
+        settingsRepository: _FakeSettingsRepository(),
+      );
+      addTearDown(viewModel.dispose);
+
+      await viewModel.start(_session);
+
+      expect(
+        viewModel.availableFilters.map((filter) => filter.label),
+        containsAll(<String>['All', 'Grab', 'Retail']),
+      );
+    },
+  );
+
+  test(
+    'matches a configured filter when an incoming ticket has no type ID',
+    () async {
+      final viewModel = KitchenBoardViewModel(
+        repository: _FakeKitchenRepository(
+          [_ticket('1', 'Grab')],
+          configuredOrderTypes: const [
+            KdsOrderType(id: 'grab', name: 'Grab', icon: 'delivery_dining'),
+          ],
+        ),
+        settingsRepository: _FakeSettingsRepository(),
+      );
+      addTearDown(viewModel.dispose);
+
+      await viewModel.start(_session);
+      viewModel.selectFilter(
+        viewModel.availableFilters.firstWhere(
+          (filter) => filter.label == 'Grab',
+        ),
+      );
+
+      expect(viewModel.ticketGroups, hasLength(1));
+      expect(viewModel.ticketGroups.single.first.orderNumber, '1');
+    },
+  );
 
   test('applies saved type visibility without deleting tickets', () async {
     final repository = _FakeKitchenRepository([
@@ -78,6 +148,39 @@ void main() {
     expect(viewModel.ticketGroups.single.first.orderNumber, '2');
   });
 
+  test('applies visibility to every configured order type', () async {
+    final repository = _FakeKitchenRepository(
+      [
+        _ticket('1', 'Dine In', orderTypeId: 'dine-in'),
+        _ticket('2', 'Grab', orderTypeId: 'grab'),
+      ],
+      configuredOrderTypes: const [
+        KdsOrderType(id: 'dine-in', name: 'Dine In', icon: 'restaurant'),
+        KdsOrderType(id: 'grab', name: 'Grab', icon: 'delivery_dining'),
+      ],
+    );
+    final viewModel = KitchenBoardViewModel(
+      repository: repository,
+      settingsRepository: _FakeSettingsRepository(),
+    );
+    addTearDown(viewModel.dispose);
+
+    await viewModel.start(_session);
+    await viewModel.saveSettings(
+      const KdsSettings(
+        orderTypeVisibility: {'grab': false, 'name:grab': false},
+      ),
+    );
+
+    expect(viewModel.tickets, hasLength(2));
+    expect(viewModel.ticketGroups, hasLength(1));
+    expect(viewModel.ticketGroups.single.first.orderNumber, '1');
+    expect(
+      viewModel.availableFilters.map((filter) => filter.label),
+      isNot(contains('Grab')),
+    );
+  });
+
   test('rejects invalid timer thresholds', () async {
     final viewModel = KitchenBoardViewModel(
       repository: _FakeKitchenRepository([]),
@@ -93,7 +196,39 @@ void main() {
     );
   });
 
-  test('crosses an item locally without writing to the repository', () {
+  test('plays the selected tone once for a newly received order', () async {
+    final repository = _FakeKitchenRepository([_ticket('1', 'Dine In')]);
+    final alertPlayer = _RecordingKitchenAlertPlayer();
+    final settingsRepository = _FakeSettingsRepository()
+      ..value = const KdsSettings(
+        newOrderAlert: true,
+        newOrderTone: KdsAlertTone.alert,
+      );
+    final viewModel = KitchenBoardViewModel(
+      repository: repository,
+      settingsRepository: settingsRepository,
+      alertPlayer: alertPlayer,
+    );
+    addTearDown(viewModel.dispose);
+
+    await viewModel.start(_session);
+    expect(alertPlayer.tones, isEmpty);
+
+    repository.addTicket(_ticket('2', 'Takeaway'));
+    repository.notifyChanged();
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(alertPlayer.tones, [KdsAlertTone.alert]);
+
+    repository.notifyChanged();
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(alertPlayer.tones, [KdsAlertTone.alert]);
+  });
+
+  test('finishes a receipt when its last item is crossed', () async {
     final ticket = KitchenTicket(
       messageId: 'message-1',
       saleId: 'sale-1',
@@ -112,18 +247,20 @@ void main() {
     addTearDown(viewModel.dispose);
 
     viewModel.toggleItemCrossed(ticket, 0);
+    await Future<void>.delayed(Duration.zero);
 
     expect(viewModel.isItemCrossed(ticket, 0), isTrue);
-    expect(repository.dismissCalls, isZero);
-
-    viewModel.toggleItemCrossed(ticket, 0);
-
-    expect(viewModel.isItemCrossed(ticket, 0), isFalse);
+    expect(viewModel.isCompletedLocally([ticket]), isTrue);
+    expect(
+      viewModel.completionSecondsRemaining([ticket]),
+      inInclusiveRange(1, 10),
+    );
+    expect(repository.finishCalls, 1);
     expect(repository.dismissCalls, isZero);
   });
 
   test(
-    'finishes a receipt locally without writing to the repository',
+    'finishes a receipt locally and allows it to be restored during countdown',
     () async {
       final ticket = _ticket('1', 'Dine In');
       final repository = _FakeKitchenRepository([ticket]);
@@ -134,16 +271,71 @@ void main() {
       addTearDown(viewModel.dispose);
 
       await viewModel.start(_session);
-      viewModel.completeLocally([ticket]);
+      await viewModel.completeLocally([ticket]);
 
       expect(
         viewModel.completionSecondsRemaining([ticket]),
         inInclusiveRange(1, 10),
       );
+      expect(viewModel.isCompletedLocally([ticket]), isTrue);
       expect(viewModel.ticketGroups, hasLength(1));
-      expect(repository.dismissCalls, isZero);
+      expect(viewModel.todayHistoryGroups, hasLength(1));
+      expect(viewModel.todayHistoryGroups.single.first.orderNumber, '1');
+      expect(repository.finishCalls, 1);
+
+      await viewModel.undoLocalCompletion([ticket]);
+
+      expect(viewModel.completionSecondsRemaining([ticket]), isZero);
+      expect(viewModel.isCompletedLocally([ticket]), isFalse);
+      expect(viewModel.todayHistoryGroups, isEmpty);
+      expect(repository.restoreCalls, 1);
     },
   );
+
+  test(
+    'does not return a finished receipt after the display restarts',
+    () async {
+      final ticket = _ticket('1', 'Dine In');
+      final repository = _FakeKitchenRepository([ticket]);
+      final firstDisplay = KitchenBoardViewModel(
+        repository: repository,
+        settingsRepository: _FakeSettingsRepository(),
+      );
+
+      await firstDisplay.start(_session);
+      await firstDisplay.completeLocally([ticket]);
+      firstDisplay.dispose();
+
+      final restartedDisplay = KitchenBoardViewModel(
+        repository: repository,
+        settingsRepository: _FakeSettingsRepository(),
+      );
+      addTearDown(restartedDisplay.dispose);
+      await restartedDisplay.start(_session);
+
+      expect(restartedDisplay.ticketGroups, isEmpty);
+      expect(restartedDisplay.todayHistoryGroups, hasLength(1));
+      expect(restartedDisplay.todayHistoryGroups.single.first.orderNumber, '1');
+    },
+  );
+
+  test('loads persisted finished receipts into today history', () async {
+    final today = _ticket('101', 'Dine In');
+    final repository = _FakeKitchenRepository(
+      const [],
+      finishedHistory: [today],
+    );
+    final viewModel = KitchenBoardViewModel(
+      repository: repository,
+      settingsRepository: _FakeSettingsRepository(),
+    );
+    addTearDown(viewModel.dispose);
+
+    await viewModel.loadTodayHistory();
+
+    expect(repository.historyCalls, 1);
+    expect(viewModel.todayHistoryGroups, hasLength(1));
+  });
 }
 
 class _FakeSettingsRepository implements DisplaySettingsRepository {
@@ -160,23 +352,39 @@ const _session = DisplaySession(
   displayName: 'Kitchen',
 );
 
-KitchenTicket _ticket(String orderNumber, String type) => KitchenTicket(
-  messageId: 'message-$orderNumber',
-  saleId: 'sale-$orderNumber',
-  departmentId: 'kitchen',
-  revision: 1,
-  action: 'upsert',
-  orderNumber: orderNumber,
-  createdAt: DateTime(2026),
-  items: const [],
-  orderTypeName: type,
-);
+KitchenTicket _ticket(String orderNumber, String type, {String? orderTypeId}) =>
+    KitchenTicket(
+      messageId: 'message-$orderNumber',
+      saleId: 'sale-$orderNumber',
+      departmentId: 'kitchen',
+      revision: 1,
+      action: 'upsert',
+      orderNumber: orderNumber,
+      createdAt: DateTime(2026),
+      items: const [],
+      orderTypeId: orderTypeId,
+      orderTypeName: type,
+    );
 
 class _FakeKitchenRepository implements KitchenRepository {
-  _FakeKitchenRepository(this._tickets);
+  _FakeKitchenRepository(
+    this._tickets, {
+    this.finishedHistory = const [],
+    this.configuredOrderTypes = const [],
+  });
   final List<KitchenTicket> _tickets;
+  final List<KitchenTicket> finishedHistory;
+  final List<KdsOrderType> configuredOrderTypes;
+  final Set<String> _finishedTicketIds = <String>{};
   final _changes = StreamController<void>.broadcast();
   int dismissCalls = 0;
+  int finishCalls = 0;
+  int restoreCalls = 0;
+  int historyCalls = 0;
+
+  void addTicket(KitchenTicket ticket) => _tickets.add(ticket);
+
+  void notifyChanged() => _changes.add(null);
 
   @override
   Stream<void> get changes => _changes.stream;
@@ -197,11 +405,41 @@ class _FakeKitchenRepository implements KitchenRepository {
   }
 
   @override
-  Future<List<KdsOrderType>> orderTypes() async => const [];
+  Future<List<KitchenTicket>> historyForDay(DateTime day) async {
+    historyCalls++;
+    return <KitchenTicket>{
+      ...finishedHistory,
+      ..._tickets.where((ticket) => _finishedTicketIds.contains(ticket.id)),
+    }.toList(growable: false);
+  }
 
   @override
-  Future<List<KitchenTicket>> start(DisplaySession session) async => _tickets;
+  Future<void> markFinished(List<String> ticketIds) async {
+    finishCalls++;
+    _finishedTicketIds.addAll(ticketIds);
+  }
+
+  @override
+  Future<void> restoreFinished(List<String> ticketIds) async {
+    restoreCalls++;
+    _finishedTicketIds.removeAll(ticketIds);
+  }
+
+  @override
+  Future<List<KdsOrderType>> orderTypes() async => configuredOrderTypes;
+
+  @override
+  Future<List<KitchenTicket>> start(DisplaySession session) async => _tickets
+      .where((ticket) => !_finishedTicketIds.contains(ticket.id))
+      .toList(growable: false);
 
   @override
   Future<void> updateOrderTypeIcon(String id, String icon) async {}
+}
+
+class _RecordingKitchenAlertPlayer implements KitchenAlertPlayer {
+  final List<KdsAlertTone> tones = <KdsAlertTone>[];
+
+  @override
+  Future<void> play(KdsAlertTone tone) async => tones.add(tone);
 }

@@ -14,6 +14,9 @@ abstract interface class KitchenRepository {
   Stream<PairingConnectionState> get pairingStates;
 
   Future<List<KitchenTicket>> dismiss(String ticketId);
+  Future<void> markFinished(List<String> ticketIds);
+  Future<void> restoreFinished(List<String> ticketIds);
+  Future<List<KitchenTicket>> historyForDay(DateTime day);
   Future<List<KitchenTicket>> start(DisplaySession session);
   Future<List<KdsOrderType>> orderTypes();
   Future<void> updateOrderTypeIcon(String id, String icon);
@@ -69,6 +72,18 @@ class StoredKitchenRepository implements KitchenRepository {
     _changes.add(null);
     return tickets;
   }
+
+  @override
+  Future<void> markFinished(List<String> ticketIds) =>
+      _store.markFinished(ticketIds);
+
+  @override
+  Future<void> restoreFinished(List<String> ticketIds) =>
+      _store.restoreFinished(ticketIds);
+
+  @override
+  Future<List<KitchenTicket>> historyForDay(DateTime day) =>
+      _store.historyTicketsForDay(day);
 
   @override
   Future<List<KdsOrderType>> orderTypes() => _store.orderTypes();
