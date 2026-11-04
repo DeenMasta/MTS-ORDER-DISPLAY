@@ -37,7 +37,7 @@ class AppDependencies {
       settingsRepository: StoredDisplaySettingsRepository(
         store: DisplaySettingsStore(openDatabase: AppDatabase.open),
       ),
-      alertPlayer: const SystemKitchenAlertPlayer(),
+      alertPlayer: BuiltInKitchenAlertPlayer(),
     );
   }
 

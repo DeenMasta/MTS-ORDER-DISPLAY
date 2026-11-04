@@ -11,11 +11,11 @@ import 'kitchen_history_screen.dart';
 import 'kitchen_settings_screen.dart';
 import 'slanted_timer_clipper.dart';
 
-const _appChromeSurface = Color(0xFF080F13);
-const _appChromeElevated = Color(0xFF101B20);
-const _appChromeBorder = Color(0xFF315356);
-const _appChromeAccent = Color(0xFF58D0BF);
-const _appChromeMuted = Color(0xFFA6BEBA);
+const _appChromeSurface = Color(0xFF06111E);
+const _appChromeElevated = Color(0xFF0C2134);
+const _appChromeBorder = Color(0xFF2D668D);
+const _appChromeAccent = Color(0xFF64CFFF);
+const _appChromeMuted = Color(0xFFA8C7DA);
 
 class KitchenBoardScreen extends StatefulWidget {
   const KitchenBoardScreen({
@@ -256,9 +256,20 @@ class _Header extends StatelessWidget {
     height: compact ? 52 : 58,
     padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 16),
     decoration: BoxDecoration(
-      color: const Color(0xDD02070D),
+      gradient: const LinearGradient(
+        colors: [Color(0xEE061522), Color(0xEE0B2438)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
       borderRadius: BorderRadius.circular(12),
       border: Border.all(color: _appChromeBorder),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x33000000),
+          blurRadius: 14,
+          offset: Offset(0, 5),
+        ),
+      ],
     ),
     child: Row(
       children: [
@@ -314,7 +325,7 @@ class _KitchenSideMenu extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(22, 22, 16, 20),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [_appChromeElevated, _appChromeSurface],
+                  colors: [Color(0xFF10324C), _appChromeSurface],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -405,7 +416,7 @@ class _SideMenuItem extends StatelessWidget {
       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
     ),
     subtitle: Text(detail, style: const TextStyle(color: _appChromeMuted)),
-    trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF87AAA4)),
+    trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF83C9ED)),
     onTap: onTap,
   );
 }
@@ -477,15 +488,34 @@ class _TicketPager extends StatefulWidget {
 
 class _TicketPagerState extends State<_TicketPager> {
   late final PageController _controller;
+  late int _displayedPage;
 
   @override
   void initState() {
     super.initState();
+    _displayedPage = widget.viewModel.page;
     _controller = PageController(
-      initialPage: widget.viewModel.page,
+      initialPage: _displayedPage,
       viewportFraction: 1,
       keepPage: false,
     );
+  }
+
+  @override
+  void didUpdateWidget(covariant _TicketPager oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final targetPage = widget.viewModel.page;
+    if (targetPage == _displayedPage) return;
+    _displayedPage = targetPage;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_controller.hasClients) return;
+      if ((_controller.page ?? targetPage).round() == targetPage) return;
+      _controller.animateToPage(
+        targetPage,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   @override
@@ -494,62 +524,36 @@ class _TicketPagerState extends State<_TicketPager> {
     super.dispose();
   }
 
-  void _snapToPageBoundary() {
-    if (!_controller.hasClients) return;
-    final currentPage = _controller.page;
-    if (currentPage == null) return;
-
-    final targetPage = currentPage.round().clamp(
-      0,
-      widget.viewModel.pageCount - 1,
-    );
-    if ((currentPage - targetPage).abs() < .001) return;
-
-    _controller.jumpToPage(targetPage);
-    widget.viewModel.showPage(targetPage);
-  }
-
   @override
-  Widget build(BuildContext context) =>
-      NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          if (notification is ScrollEndNotification &&
-              notification.metrics.axis == Axis.horizontal) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _snapToPageBoundary();
-            });
-          }
-          return false;
-        },
-        child: ClipRect(
-          child: PageView.builder(
-            controller: _controller,
-            clipBehavior: Clip.hardEdge,
-            physics: const PageScrollPhysics(),
-            pageSnapping: true,
-            itemCount: widget.viewModel.pageCount,
-            onPageChanged: widget.viewModel.showPage,
-            itemBuilder: (context, page) => Padding(
-              // Retain full-width pages for smooth snapping, while giving
-              // adjacent pages the same 12 px visual gap as receipt cards.
-              padding: const EdgeInsets.symmetric(horizontal: 6),
-              child: _TicketGrid(
-                groups: widget.groups
-                    .skip(page * 4)
-                    .take(4)
-                    .toList(growable: false),
-                iconNameFor: widget.iconNameFor,
-                settings: widget.settings,
-                isCrossed: widget.isCrossed,
-                onToggle: widget.onToggle,
-                completionSecondsRemaining: widget.completionSecondsRemaining,
-                onComplete: widget.onComplete,
-                onUndoComplete: widget.onUndoComplete,
-              ),
-            ),
-          ),
-        ),
-      );
+  Widget build(BuildContext context) => PageView.builder(
+    controller: _controller,
+    clipBehavior: Clip.hardEdge,
+    physics: const PageScrollPhysics(),
+    pageSnapping: true,
+    itemCount: widget.viewModel.pageCount,
+    onPageChanged: (page) {
+      _displayedPage = page;
+      widget.viewModel.showPage(page);
+    },
+    itemBuilder: (context, page) => Padding(
+      // Retain full-width pages for smooth snapping, while giving adjacent
+      // pages the same 12 px visual gap as receipt cards.
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      child: _TicketGrid(
+        groups: widget.groups
+            .skip(page * widget.viewModel.receiptsPerPage)
+            .take(widget.viewModel.receiptsPerPage)
+            .toList(growable: false),
+        iconNameFor: widget.iconNameFor,
+        settings: widget.settings,
+        isCrossed: widget.isCrossed,
+        onToggle: widget.onToggle,
+        completionSecondsRemaining: widget.completionSecondsRemaining,
+        onComplete: widget.onComplete,
+        onUndoComplete: widget.onUndoComplete,
+      ),
+    ),
+  );
 }
 
 class _TicketGrid extends StatelessWidget {
@@ -751,10 +755,8 @@ class _TicketCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      if (settings.showTypeIcons) ...[
-                        Icon(_orderTypeIcon(iconName), size: 18),
-                        const SizedBox(width: 6),
-                      ],
+                      Icon(_orderTypeIcon(iconName), size: 18),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: Text(
                           ticket.orderTypeName?.toUpperCase() ?? 'ORDER',

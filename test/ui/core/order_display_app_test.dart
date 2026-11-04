@@ -83,6 +83,9 @@ class EmptyKitchenRepository implements KitchenRepository {
 
   @override
   Future<void> updateOrderTypeIcon(String id, String icon) async {}
+
+  @override
+  Future<void> deleteOrderType(String id) async {}
 }
 
 class EmptyPairingRepository implements PairingRepository {

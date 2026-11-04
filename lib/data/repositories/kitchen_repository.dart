@@ -20,6 +20,7 @@ abstract interface class KitchenRepository {
   Future<List<KitchenTicket>> start(DisplaySession session);
   Future<List<KdsOrderType>> orderTypes();
   Future<void> updateOrderTypeIcon(String id, String icon);
+  Future<void> deleteOrderType(String id);
 }
 
 class StoredKitchenRepository implements KitchenRepository {
@@ -91,6 +92,9 @@ class StoredKitchenRepository implements KitchenRepository {
   @override
   Future<void> updateOrderTypeIcon(String id, String icon) =>
       _store.updateOrderTypeIcon(id, icon);
+
+  @override
+  Future<void> deleteOrderType(String id) => _store.deleteOrderType(id);
 
   Future<void> _receive(Map<String, dynamic> message) async {
     if (!_pairingRepository.isPaired ||

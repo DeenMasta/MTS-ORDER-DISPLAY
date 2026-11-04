@@ -76,14 +76,6 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
 
   void _update(KdsSettings value) => setState(() => _draft = value);
 
-  void _setOrderTypeVisibility(KdsOrderType type, bool visible) => _update(
-    _draft.withOrderTypeVisibility(
-      id: type.id,
-      name: type.name,
-      visible: visible,
-    ),
-  );
-
   Future<void> _loadOrderTypes() async {
     final orderTypes = await widget.viewModel.orderTypes();
     if (!mounted) return;
@@ -114,10 +106,48 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
     });
   }
 
+  Future<void> _removeOrderType(KdsOrderType type) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Remove ${type.name}?'),
+        content: const Text(
+          'This hides the type and matching receipts on this display only. The POS and its order data are not changed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.tonalIcon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.delete_outline_rounded),
+            label: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await widget.viewModel.removeOrderType(type);
+    if (!mounted) return;
+    setState(() {
+      _orderTypes = _orderTypes
+          .where((orderType) => orderType.id != type.id)
+          .toList(growable: false);
+      _draft = _draft.withOrderTypeVisibility(
+        id: type.id,
+        name: type.name,
+        visible: false,
+      );
+    });
+    _message('${type.name} removed from this display.');
+  }
+
   Future<String?> _showOrderTypeIconPicker(KdsOrderType type) =>
       showModalBottomSheet<String>(
         context: context,
-        backgroundColor: const Color(0xFF081827),
+        backgroundColor: const Color(0xFF0A1A29),
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
@@ -131,13 +161,14 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                   Text(
                     'Choose an icon for ${type.name}',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 4),
                   const Text(
                     'This icon is used on the receipt and dashboard.',
-                    style: TextStyle(color: Color(0xFFA8C6D6)),
+                    style: TextStyle(color: Color(0xFFB7CAD6)),
                   ),
                   const SizedBox(height: 20),
                   for (final category in const [
@@ -148,7 +179,7 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                     Text(
                       category,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: const Color(0xFF43C9F5),
+                        color: const Color(0xFF85ACC1),
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -202,29 +233,76 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
     }
   }
 
+  Future<void> _testAlertSound({required bool urgent}) async {
+    try {
+      await (urgent
+          ? widget.viewModel.testUrgentOrderSound()
+          : widget.viewModel.testNewOrderSound());
+    } on Object {
+      _message('Unable to play the built-in alert sound.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Theme(
     data: ThemeData(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF58D0BF),
-        brightness: Brightness.dark,
-      ),
-      scaffoldBackgroundColor: const Color(0xFF060B10),
+      colorScheme:
+          ColorScheme.fromSeed(
+            seedColor: const Color(0xFF397A9F),
+            brightness: Brightness.dark,
+          ).copyWith(
+            primary: const Color(0xFF5C97B9),
+            onPrimary: const Color(0xFF06111E),
+            secondary: const Color(0xFF789AAE),
+            surface: const Color(0xFF0A1A29),
+            onSurface: const Color(0xFFE6EEF3),
+            outline: const Color(0xFF284A60),
+          ),
+      scaffoldBackgroundColor: const Color(0xFF06111E),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF0B1219),
+        backgroundColor: Color(0xFF081725),
         foregroundColor: Colors.white,
       ),
       cardTheme: CardThemeData(
-        color: const Color(0xFF0D171E),
+        color: const Color(0xFF0A1A29),
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Color(0xFF28434A)),
+          side: const BorderSide(color: Color(0xFF284A60)),
         ),
       ),
       inputDecorationTheme: const InputDecorationTheme(
         filled: true,
-        fillColor: Color(0xFF090F15),
+        fillColor: Color(0xFF071522),
+        labelStyle: TextStyle(color: Color(0xFFB7CAD6)),
+        suffixStyle: TextStyle(color: Color(0xFF91AABD)),
+        enabledBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Color(0xFF284A60)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: BorderSide(color: Color(0xFF5C97B9), width: 1.5),
+        ),
+      ),
+      textTheme: ThemeData.dark().textTheme.apply(
+        bodyColor: const Color(0xFFD7E3EA),
+        displayColor: const Color(0xFFF1F6F8),
+      ),
+      listTileTheme: const ListTileThemeData(
+        iconColor: Color(0xFF92B6CA),
+        textColor: Color(0xFFE6EEF3),
+        subtitleTextStyle: TextStyle(color: Color(0xFF9CB2C0)),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? const Color(0xFFC8DDE8)
+              : const Color(0xFF9BAAB2),
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? const Color(0xFF376C8A)
+              : const Color(0xFF34414A),
+        ),
       ),
     ),
     child: Scaffold(
@@ -238,14 +316,8 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
                 child: Text(
-                  'Choose which order types appear on this display. Changes apply after Save changes.',
+                  'Use the switch to show a type on the dashboard. Tap a type to change its icon.',
                 ),
-              ),
-              SwitchListTile(
-                title: const Text('Show order type icons'),
-                value: _draft.showTypeIcons,
-                onChanged: (value) =>
-                    _update(_draft.copyWith(showTypeIcons: value)),
               ),
               if (_loadingOrderTypes)
                 const Padding(
@@ -264,13 +336,13 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                   ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                     leading: CircleAvatar(
-                      backgroundColor: const Color(0xFF123A52),
-                      foregroundColor: const Color(0xFF49CCF4),
+                      backgroundColor: const Color(0xFF17364B),
+                      foregroundColor: const Color(0xFF9EC6D9),
                       child: Icon(orderTypeIconFor(type.icon)),
                     ),
                     title: Text(type.name),
                     subtitle: Text(
-                      '${_draft.isOrderTypeVisible(id: type.id, name: type.name) ? 'Shown on dashboard' : 'Hidden from dashboard'} • Icon: ${orderTypeIconOptionFor(type.icon).label}',
+                      '${_draft.isOrderTypeVisible(id: type.id, name: type.name) ? 'Shown on dashboard' : 'Hidden from dashboard'} \u00b7 ${orderTypeIconOptionFor(type.icon).label}',
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -280,8 +352,18 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                             id: type.id,
                             name: type.name,
                           ),
-                          onChanged: (visible) =>
-                              _setOrderTypeVisibility(type, visible),
+                          onChanged: (visible) => _update(
+                            _draft.withOrderTypeVisibility(
+                              id: type.id,
+                              name: type.name,
+                              visible: visible,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Remove ${type.name}',
+                          onPressed: () => _removeOrderType(type),
+                          icon: const Icon(Icons.delete_outline_rounded),
                         ),
                         const Icon(Icons.chevron_right_rounded),
                       ],
@@ -338,26 +420,11 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                 onChanged: (value) =>
                     _update(_draft.copyWith(newOrderAlert: value)),
               ),
-              ListTile(
-                enabled: _draft.newOrderAlert,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                leading: const Icon(Icons.notifications_active_outlined),
-                title: const Text('New-order tone'),
-                subtitle: const Text('Choose the sound for incoming orders.'),
-                trailing: DropdownButton<KdsAlertTone>(
-                  value: _draft.newOrderTone,
-                  items: [
-                    for (final tone in KdsAlertTone.values)
-                      DropdownMenuItem(value: tone, child: Text(tone.label)),
-                  ],
-                  onChanged: !_draft.newOrderAlert
-                      ? null
-                      : (tone) {
-                          if (tone != null) {
-                            _update(_draft.copyWith(newOrderTone: tone));
-                          }
-                        },
-                ),
+              const ListTile(
+                contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                leading: Icon(Icons.notifications_active_outlined),
+                title: Text('New-order sound'),
+                subtitle: Text('Built-in two-note kitchen chime.'),
               ),
               SwitchListTile(
                 title: const Text('Urgent-order alert'),
@@ -368,26 +435,11 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                 onChanged: (value) =>
                     _update(_draft.copyWith(urgentOrderAlert: value)),
               ),
-              ListTile(
-                enabled: _draft.urgentOrderAlert,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                leading: const Icon(Icons.crisis_alert_outlined),
-                title: const Text('Urgent-order tone'),
-                subtitle: const Text('Choose the sound for red-timer orders.'),
-                trailing: DropdownButton<KdsAlertTone>(
-                  value: _draft.urgentOrderTone,
-                  items: [
-                    for (final tone in KdsAlertTone.values)
-                      DropdownMenuItem(value: tone, child: Text(tone.label)),
-                  ],
-                  onChanged: !_draft.urgentOrderAlert
-                      ? null
-                      : (tone) {
-                          if (tone != null) {
-                            _update(_draft.copyWith(urgentOrderTone: tone));
-                          }
-                        },
-                ),
+              const ListTile(
+                contentPadding: EdgeInsets.symmetric(horizontal: 16),
+                leading: Icon(Icons.crisis_alert_outlined),
+                title: Text('Urgent-order sound'),
+                subtitle: Text('Built-in three-note urgent alert.'),
               ),
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
@@ -400,52 +452,17 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                   runSpacing: 8,
                   children: [
                     OutlinedButton.icon(
-                      onPressed: () =>
-                          widget.viewModel.testAlertTone(_draft.newOrderTone),
+                      onPressed: () => _testAlertSound(urgent: false),
                       icon: const Icon(Icons.volume_up_outlined),
-                      label: const Text('Test new-order tone'),
+                      label: const Text('Test new-order sound'),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () => widget.viewModel.testAlertTone(
-                        _draft.urgentOrderTone,
-                      ),
+                      onPressed: () => _testAlertSound(urgent: true),
                       icon: const Icon(Icons.warning_amber_rounded),
-                      label: const Text('Test urgent tone'),
+                      label: const Text('Test urgent sound'),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          _Section(
-            title: 'Dashboard layout',
-            children: [
-              SwitchListTile(
-                title: const Text('Large receipt text'),
-                subtitle: const Text(
-                  'Make order items easier to read at a distance.',
-                ),
-                value: _draft.largeText,
-                onChanged: (value) =>
-                    _update(_draft.copyWith(largeText: value)),
-              ),
-              SwitchListTile(
-                title: const Text('Compact receipt cards'),
-                subtitle: const Text(
-                  'Fit more order information in each card.',
-                ),
-                value: _draft.compactCards,
-                onChanged: (value) =>
-                    _update(_draft.copyWith(compactCards: value)),
-              ),
-              SwitchListTile(
-                title: const Text('Newest orders first'),
-                subtitle: const Text(
-                  'Off keeps the oldest orders at the front.',
-                ),
-                value: _draft.newestFirst,
-                onChanged: (value) =>
-                    _update(_draft.copyWith(newestFirst: value)),
               ),
             ],
           ),
@@ -565,7 +582,7 @@ class _OrderTypeIconChoice extends StatelessWidget {
     selected: selected,
     label: option.label,
     child: Material(
-      color: selected ? const Color(0xFF0D526D) : const Color(0xFF10283A),
+      color: selected ? const Color(0xFF28566D) : const Color(0xFF12283A),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -581,8 +598,8 @@ class _OrderTypeIconChoice extends StatelessWidget {
                 Icon(
                   option.icon,
                   color: selected
-                      ? const Color(0xFF69DCF9)
-                      : const Color(0xFFD6E9F0),
+                      ? const Color(0xFFC5E0EA)
+                      : const Color(0xFFCFDEE5),
                 ),
                 const SizedBox(height: 7),
                 Text(
@@ -591,8 +608,8 @@ class _OrderTypeIconChoice extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: selected
-                        ? const Color(0xFF69DCF9)
-                        : const Color(0xFFD6E9F0),
+                        ? const Color(0xFFC5E0EA)
+                        : const Color(0xFFCFDEE5),
                     fontSize: 11,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                   ),
@@ -611,26 +628,54 @@ class _TimerPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) => const Row(
     children: [
-      _Preview(color: Color(0xFF02D53C), label: '00:03:00'),
+      _Preview(
+        color: Color(0xFF02D53C),
+        foregroundColor: Color(0xFF05090C),
+        label: '00:03:00',
+      ),
       SizedBox(width: 8),
-      _Preview(color: Color(0xFFFFEF00), label: '00:05:00'),
+      _Preview(
+        color: Color(0xFFFFEF00),
+        foregroundColor: Color(0xFF05090C),
+        label: '00:05:00',
+      ),
       SizedBox(width: 8),
-      _Preview(color: Color(0xFFFF1C2C), label: '00:10:00'),
+      _Preview(
+        color: Color(0xFFFF1C2C),
+        foregroundColor: Color(0xFF05090C),
+        label: '00:10:00',
+      ),
     ],
   );
 }
 
 class _Preview extends StatelessWidget {
-  const _Preview({required this.color, required this.label});
+  const _Preview({
+    required this.color,
+    required this.foregroundColor,
+    required this.label,
+  });
   final Color color;
+  final Color foregroundColor;
   final String label;
   @override
   Widget build(BuildContext context) => Expanded(
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      color: color,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Color(0x33000000)),
+      ),
       alignment: Alignment.center,
-      child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: foregroundColor,
+          fontWeight: FontWeight.w900,
+          letterSpacing: .4,
+        ),
+      ),
     ),
   );
 }

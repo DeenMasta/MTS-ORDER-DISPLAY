@@ -115,6 +115,16 @@ class TicketStore {
     );
   }
 
+  /// Removes only this display's local order-type configuration. It never
+  /// sends a mutation to the POS or changes its source order data.
+  Future<void> deleteOrderType(String id) async {
+    await (await _db).database.delete(
+      'order_types',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   Future<void> dismiss(String ticketId) async {
     await markFinished([ticketId]);
   }

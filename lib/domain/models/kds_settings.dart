@@ -19,10 +19,6 @@ extension KdsAlertToneLabel on KdsAlertTone {
 
 class KdsSettings {
   const KdsSettings({
-    this.showDineIn = true,
-    this.showTakeaway = true,
-    this.orderTypeVisibility = const {},
-    this.showTypeIcons = true,
     this.warningMinutes = 5,
     this.urgentMinutes = 10,
     this.largeText = false,
@@ -32,15 +28,9 @@ class KdsSettings {
     this.urgentOrderAlert = false,
     this.newOrderTone = KdsAlertTone.chime,
     this.urgentOrderTone = KdsAlertTone.alert,
+    this.orderTypeVisibility = const {},
   });
 
-  final bool showDineIn;
-  final bool showTakeaway;
-
-  /// Per-type dashboard visibility, keyed by POS ID and, for older tickets,
-  /// a normalized order-type name.
-  final Map<String, bool> orderTypeVisibility;
-  final bool showTypeIcons;
   final int warningMinutes;
   final int urgentMinutes;
   final bool largeText;
@@ -50,12 +40,36 @@ class KdsSettings {
   final bool urgentOrderAlert;
   final KdsAlertTone newOrderTone;
   final KdsAlertTone urgentOrderTone;
+  final Map<String, bool> orderTypeVisibility;
+
+  /// Order types are visible by default so newly received POS types appear
+  /// without requiring any local configuration.
+  bool isOrderTypeVisible({String? id, String? name}) {
+    final normalizedId = id?.trim();
+    final normalizedName = name?.trim().toLowerCase();
+    return (normalizedId == null || normalizedId.isEmpty
+            ? null
+            : orderTypeVisibility['id:$normalizedId'] ??
+                  orderTypeVisibility[normalizedId]) ??
+        (normalizedName == null || normalizedName.isEmpty
+            ? null
+            : orderTypeVisibility['name:$normalizedName']) ??
+        true;
+  }
+
+  KdsSettings withOrderTypeVisibility({
+    required String? id,
+    required String? name,
+    required bool visible,
+  }) {
+    final key = _orderTypeKey(id: id, name: name);
+    if (key == null) return this;
+    return copyWith(
+      orderTypeVisibility: {...orderTypeVisibility, key: visible},
+    );
+  }
 
   KdsSettings copyWith({
-    bool? showDineIn,
-    bool? showTakeaway,
-    Map<String, bool>? orderTypeVisibility,
-    bool? showTypeIcons,
     int? warningMinutes,
     int? urgentMinutes,
     bool? largeText,
@@ -65,11 +79,8 @@ class KdsSettings {
     bool? urgentOrderAlert,
     KdsAlertTone? newOrderTone,
     KdsAlertTone? urgentOrderTone,
+    Map<String, bool>? orderTypeVisibility,
   }) => KdsSettings(
-    showDineIn: showDineIn ?? this.showDineIn,
-    showTakeaway: showTakeaway ?? this.showTakeaway,
-    orderTypeVisibility: orderTypeVisibility ?? this.orderTypeVisibility,
-    showTypeIcons: showTypeIcons ?? this.showTypeIcons,
     warningMinutes: warningMinutes ?? this.warningMinutes,
     urgentMinutes: urgentMinutes ?? this.urgentMinutes,
     largeText: largeText ?? this.largeText,
@@ -79,47 +90,10 @@ class KdsSettings {
     urgentOrderAlert: urgentOrderAlert ?? this.urgentOrderAlert,
     newOrderTone: newOrderTone ?? this.newOrderTone,
     urgentOrderTone: urgentOrderTone ?? this.urgentOrderTone,
+    orderTypeVisibility: orderTypeVisibility ?? this.orderTypeVisibility,
   );
 
-  /// Returns whether this order type should appear on this display.
-  ///
-  /// Earlier versions saved only Dine In/Takeaway flags. They remain the
-  /// fallback until a specific type has been configured.
-  bool isOrderTypeVisible({String? id, String? name}) {
-    final typeId = id?.trim();
-    if (typeId?.isNotEmpty == true) {
-      final byId = orderTypeVisibility[typeId];
-      if (byId != null) return byId;
-    }
-    final nameKey = _nameKey(name);
-    if (nameKey != null) {
-      final byName = orderTypeVisibility[nameKey];
-      if (byName != null) return byName;
-    }
-    final normalizedName = name?.trim().toLowerCase() ?? '';
-    if (normalizedName.contains('take')) return showTakeaway;
-    if (normalizedName.contains('dine')) return showDineIn;
-    return true;
-  }
-
-  /// Creates settings with a visibility preference for one POS order type.
-  KdsSettings withOrderTypeVisibility({
-    required String id,
-    required String name,
-    required bool visible,
-  }) {
-    final values = Map<String, bool>.from(orderTypeVisibility);
-    values[id] = visible;
-    final nameKey = _nameKey(name);
-    if (nameKey != null) values[nameKey] = visible;
-    return copyWith(orderTypeVisibility: values);
-  }
-
   Map<String, Object> toJson() => {
-    'show_dine_in': showDineIn,
-    'show_takeaway': showTakeaway,
-    'order_type_visibility': orderTypeVisibility,
-    'show_type_icons': showTypeIcons,
     'warning_minutes': warningMinutes,
     'urgent_minutes': urgentMinutes,
     'large_text': largeText,
@@ -129,13 +103,10 @@ class KdsSettings {
     'urgent_order_alert': urgentOrderAlert,
     'new_order_tone': newOrderTone.name,
     'urgent_order_tone': urgentOrderTone.name,
+    'order_type_visibility': orderTypeVisibility,
   };
 
   factory KdsSettings.fromJson(Map<String, dynamic> json) => KdsSettings(
-    showDineIn: json['show_dine_in'] as bool? ?? true,
-    showTakeaway: json['show_takeaway'] as bool? ?? true,
-    orderTypeVisibility: _visibilityFromJson(json['order_type_visibility']),
-    showTypeIcons: json['show_type_icons'] as bool? ?? true,
     warningMinutes: json['warning_minutes'] as int? ?? 5,
     urgentMinutes: json['urgent_minutes'] as int? ?? 10,
     largeText: json['large_text'] as bool? ?? false,
@@ -151,19 +122,25 @@ class KdsSettings {
       json['urgent_order_tone'],
       KdsAlertTone.alert,
     ),
+    orderTypeVisibility: _visibilityFromJson(json['order_type_visibility']),
   );
 
-  static Map<String, bool> _visibilityFromJson(Object? raw) {
-    if (raw is! Map) return const {};
-    return {
-      for (final entry in raw.entries)
-        if (entry.key is String && entry.value is bool)
-          entry.key as String: entry.value as bool,
-    };
+  static String? _orderTypeKey({String? id, String? name}) {
+    final normalizedId = id?.trim();
+    if (normalizedId != null && normalizedId.isNotEmpty) {
+      return 'id:$normalizedId';
+    }
+    final normalizedName = name?.trim().toLowerCase();
+    if (normalizedName == null || normalizedName.isEmpty) return null;
+    return 'name:$normalizedName';
   }
 
-  static String? _nameKey(String? name) {
-    final normalized = name?.trim().toLowerCase() ?? '';
-    return normalized.isEmpty ? null : 'name:$normalized';
+  static Map<String, bool> _visibilityFromJson(Object? value) {
+    if (value is! Map) return const {};
+    return Map.unmodifiable({
+      for (final entry in value.entries)
+        if (entry.key is String && entry.value is bool)
+          entry.key as String: entry.value as bool,
+    });
   }
 }

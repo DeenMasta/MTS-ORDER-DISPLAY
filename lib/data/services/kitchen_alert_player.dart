@@ -5,13 +5,40 @@ import '../../domain/models/kds_settings.dart';
 /// Platform boundary for the local sounds used by the kitchen display.
 abstract interface class KitchenAlertPlayer {
   Future<void> play(KdsAlertTone tone);
+
+  Future<void> dispose();
 }
 
-class SystemKitchenAlertPlayer implements KitchenAlertPlayer {
-  const SystemKitchenAlertPlayer();
+/// Uses the Android audio engine for distinct KDS alerts. Unlike a third-party
+/// audio package, this channel is compiled directly into the Android app.
+///
+/// On platforms without the Android channel, it uses Flutter's system sound as
+/// a quiet fallback and deliberately never interrupts the order workflow.
+class BuiltInKitchenAlertPlayer implements KitchenAlertPlayer {
+  BuiltInKitchenAlertPlayer({MethodChannel? channel})
+    : _channel = channel ?? _kitchenAlertsChannel;
+
+  static const _kitchenAlertsChannel = MethodChannel(
+    'com.mysztechnology.mysztech_order_display/kitchen_alerts',
+  );
+
+  final MethodChannel _channel;
 
   @override
   Future<void> play(KdsAlertTone tone) async {
+    final method = tone == KdsAlertTone.chime
+        ? 'playNewOrder'
+        : 'playUrgentOrder';
+    try {
+      await _channel.invokeMethod<void>(method);
+    } on MissingPluginException {
+      await _playSystemFallback(tone);
+    } on PlatformException {
+      await _playSystemFallback(tone);
+    }
+  }
+
+  Future<void> _playSystemFallback(KdsAlertTone tone) async {
     try {
       await SystemSound.play(
         tone == KdsAlertTone.chime
@@ -19,9 +46,14 @@ class SystemKitchenAlertPlayer implements KitchenAlertPlayer {
             : SystemSoundType.alert,
       );
     } on MissingPluginException {
-      // Sound is optional and unavailable on some desktop/device targets.
+      // Alerts are optional on a platform without a system sound channel.
+    } on PlatformException {
+      // Alerts must never block a kitchen order from rendering.
     }
   }
+
+  @override
+  Future<void> dispose() async {}
 }
 
 class SilentKitchenAlertPlayer implements KitchenAlertPlayer {
@@ -29,4 +61,7 @@ class SilentKitchenAlertPlayer implements KitchenAlertPlayer {
 
   @override
   Future<void> play(KdsAlertTone tone) async {}
+
+  @override
+  Future<void> dispose() async {}
 }

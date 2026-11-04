@@ -66,13 +66,15 @@ class KitchenBoardViewModel extends ChangeNotifier {
 
   List<KitchenOrderFilter> get availableFilters {
     final filters = <KitchenOrderFilter>[KitchenOrderFilter.all];
-    for (final type in _orderTypes.where(
-      (type) => _isOrderTypeVisible(type.id, type.name),
-    )) {
+    for (final type in _orderTypes) {
+      if (!_settings.isOrderTypeVisible(id: type.id, name: type.name)) {
+        continue;
+      }
       final filter = KitchenOrderFilter.fromOrderType(type);
       if (!filters.any(filter.representsSameOrderType)) filters.add(filter);
     }
-    for (final ticket in _tickets.where(_isOrderVisible)) {
+    for (final ticket in _tickets) {
+      if (!_isOrderTypeVisible(ticket)) continue;
       final filter = KitchenOrderFilter.fromTicket(ticket);
       if (!filters.any(filter.representsSameOrderType)) filters.add(filter);
     }
@@ -82,7 +84,7 @@ class KitchenBoardViewModel extends ChangeNotifier {
   List<List<KitchenTicket>> get ticketGroups {
     final visible = _tickets.where(
       (ticket) =>
-          _isOrderVisible(ticket) &&
+          _isOrderTypeVisible(ticket) &&
           _filter.matches(ticket) &&
           !_isFinishedLocally(ticket),
     );
@@ -141,14 +143,28 @@ class KitchenBoardViewModel extends ChangeNotifier {
     await _repository.markFinished(tickets.map((ticket) => ticket.id).toList());
   }
 
-  /// Restores a receipt while its Finished countdown is still visible.
-  /// This restores only this display's local status; it never contacts POS.
+  /// Restores a finished receipt to this display's live dashboard.
+  /// This changes only this display's local status; it never contacts POS.
   Future<void> undoLocalCompletion(List<KitchenTicket> tickets) async {
+    final activeTicketIds = _tickets.map((ticket) => ticket.id).toSet();
     for (final ticket in tickets) {
       _completionDeadlines.remove(ticket.id);
       _locallyCompletedTicketIds.remove(ticket.id);
       _finishedHistoryTickets.remove(ticket.id);
     }
+    final restoredTickets = tickets
+        .where((ticket) => activeTicketIds.add(ticket.id))
+        .toList(growable: false);
+    if (restoredTickets.isNotEmpty) {
+      _tickets = [..._tickets, ...restoredTickets];
+    }
+    _filter = KitchenOrderFilter.all;
+    final restoredPage = ticketGroups.indexWhere(
+      (receipt) => receipt.any(
+        (ticket) => tickets.any((restored) => restored.id == ticket.id),
+      ),
+    );
+    if (restoredPage >= 0) _page = restoredPage ~/ _receiptsPerPage;
     notifyListeners();
     await _repository.restoreFinished(
       tickets.map((ticket) => ticket.id).toList(),
@@ -173,7 +189,9 @@ class KitchenBoardViewModel extends ChangeNotifier {
     return milliseconds <= 0 ? 0 : (milliseconds / 1000).ceil();
   }
 
-  Future<void> testAlertTone(KdsAlertTone tone) => _alertPlayer.play(tone);
+  Future<void> testNewOrderSound() => _alertPlayer.play(KdsAlertTone.chime);
+
+  Future<void> testUrgentOrderSound() => _alertPlayer.play(KdsAlertTone.alert);
 
   Future<void> start(DisplaySession session) async {
     _changes ??= _repository.changes.listen(
@@ -226,9 +244,6 @@ class KitchenBoardViewModel extends ChangeNotifier {
       throw const FormatException(
         'Yellow threshold must be greater than 0 and lower than red threshold.',
       );
-    }
-    if (!_hasVisibleOrderType(settings)) {
-      throw const FormatException('Keep at least one order type visible.');
     }
     await _settingsRepository.save(settings);
     _settings = settings;
@@ -296,6 +311,29 @@ class KitchenBoardViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Removes an unused type from this KDS and hides matching local receipts.
+  /// The POS API and its orders are not changed.
+  Future<void> removeOrderType(KdsOrderType type) async {
+    final updatedSettings = _settings.withOrderTypeVisibility(
+      id: type.id,
+      name: type.name,
+      visible: false,
+    );
+    await _settingsRepository.save(updatedSettings);
+    await _repository.deleteOrderType(type.id);
+    _settings = updatedSettings;
+    _orderTypes = _orderTypes
+        .where((orderType) => orderType.id != type.id)
+        .toList(growable: false);
+    _orderTypeIcons = Map.unmodifiable({
+      for (final entry in _orderTypeIcons.entries)
+        if (entry.key != type.id) entry.key: entry.value,
+    });
+    _ensureSelectedFilterIsVisible();
+    if (_page >= pageCount) _page = pageCount - 1;
+    notifyListeners();
+  }
+
   Future<void> _loadOrderTypes() async {
     final types = await _repository.orderTypes();
     _orderTypes = List.unmodifiable(types);
@@ -321,7 +359,7 @@ class KitchenBoardViewModel extends ChangeNotifier {
       final playedNewOrderSound =
           notifyForNewOrders && hasNewOrders && _settings.newOrderAlert;
       if (playedNewOrderSound) {
-        unawaited(_alertPlayer.play(_settings.newOrderTone));
+        unawaited(_playAlert(KdsAlertTone.chime));
       }
       _checkUrgentOrderAlerts(
         playSound: notifyForNewOrders && !playedNewOrderSound,
@@ -334,27 +372,27 @@ class KitchenBoardViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool _isOrderVisible(KitchenTicket ticket) {
-    return _isOrderTypeVisible(ticket.orderTypeId, ticket.orderTypeName);
-  }
-
-  bool _isOrderTypeVisible(String? id, String? name) =>
-      _settings.isOrderTypeVisible(id: id, name: name);
-
-  bool _hasVisibleOrderType(KdsSettings settings) {
-    final types = <({String? id, String? name})>[
-      for (final type in _orderTypes) (id: type.id, name: type.name),
-      for (final ticket in _tickets)
-        (id: ticket.orderTypeId, name: ticket.orderTypeName),
-    ];
-    return types.isEmpty ||
-        types.any(
-          (type) => settings.isOrderTypeVisible(id: type.id, name: type.name),
-        );
-  }
-
   void _ensureSelectedFilterIsVisible() {
     if (!availableFilters.contains(_filter)) _filter = KitchenOrderFilter.all;
+  }
+
+  bool _isOrderTypeVisible(KitchenTicket ticket) {
+    final ticketTypeId = ticket.orderTypeId;
+    final ticketTypeName = ticket.orderTypeName;
+    if (ticketTypeId != null && ticketTypeId.isNotEmpty) {
+      return _settings.isOrderTypeVisible(
+        id: ticketTypeId,
+        name: ticketTypeName,
+      );
+    }
+    final configuredType = _orderTypes.where(
+      (type) => type.name.toLowerCase() == ticketTypeName?.toLowerCase(),
+    );
+    if (configuredType.isNotEmpty) {
+      final type = configuredType.first;
+      return _settings.isOrderTypeVisible(id: type.id, name: type.name);
+    }
+    return _settings.isOrderTypeVisible(id: null, name: ticketTypeName);
   }
 
   String _itemKey(KitchenTicket ticket, int itemIndex) =>
@@ -410,7 +448,15 @@ class KitchenBoardViewModel extends ChangeNotifier {
       ..clear()
       ..addAll(currentUrgentIds);
     if (playSound && newlyUrgent.isNotEmpty && _settings.urgentOrderAlert) {
-      unawaited(_alertPlayer.play(_settings.urgentOrderTone));
+      unawaited(_playAlert(KdsAlertTone.alert));
+    }
+  }
+
+  Future<void> _playAlert(KdsAlertTone tone) async {
+    try {
+      await _alertPlayer.play(tone);
+    } on Object {
+      // A local audio issue must never prevent POS orders from rendering.
     }
   }
 
@@ -453,6 +499,7 @@ class KitchenBoardViewModel extends ChangeNotifier {
     _clock?.cancel();
     _changes?.cancel();
     _pairingStates?.cancel();
+    unawaited(_alertPlayer.dispose());
     super.dispose();
   }
 }

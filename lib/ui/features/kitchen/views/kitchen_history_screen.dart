@@ -19,6 +19,11 @@ class _KitchenHistoryScreenState extends State<KitchenHistoryScreen> {
     widget.viewModel.loadTodayHistory();
   }
 
+  Future<void> _restoreToDashboard(List<KitchenTicket> tickets) async {
+    await widget.viewModel.undoLocalCompletion(tickets);
+    if (mounted) Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFF030B15),
@@ -104,16 +109,7 @@ class _KitchenHistoryScreenState extends State<KitchenHistoryScreen> {
                               finished: widget.viewModel.isCompletedLocally(
                                 tickets,
                               ),
-                              onTap: () => Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (context) =>
-                                      KitchenHistoryDetailScreen(
-                                        tickets: tickets,
-                                        finished: widget.viewModel
-                                            .isCompletedLocally(tickets),
-                                      ),
-                                ),
-                              ),
+                              onTap: () => _restoreToDashboard(tickets),
                             );
                           },
                         ),
@@ -203,10 +199,8 @@ class _HistoryReceipt extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Color(0xFF6B9AB0),
-                ),
+                const SizedBox(width: 12),
+                const Icon(Icons.restore_rounded, color: Color(0xFF6B9AB0)),
               ],
             ),
             const SizedBox(height: 6),
