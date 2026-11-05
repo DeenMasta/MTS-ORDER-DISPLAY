@@ -147,7 +147,7 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
   Future<String?> _showOrderTypeIconPicker(KdsOrderType type) =>
       showModalBottomSheet<String>(
         context: context,
-        backgroundColor: const Color(0xFF0A1A29),
+        backgroundColor: const Color(0xFFFFFCF9),
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
@@ -161,14 +161,14 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                   Text(
                     'Choose an icon for ${type.name}',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Colors.white,
+                      color: const Color(0xFF17212B),
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 4),
                   const Text(
                     'This icon is used on the receipt and dashboard.',
-                    style: TextStyle(color: Color(0xFFB7CAD6)),
+                    style: TextStyle(color: Color(0xFF52616B)),
                   ),
                   const SizedBox(height: 20),
                   for (final category in const [
@@ -179,7 +179,7 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                     Text(
                       category,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: const Color(0xFF85ACC1),
+                        color: const Color(0xFF52616B),
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -316,62 +316,60 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
   @override
   Widget build(BuildContext context) => Theme(
     data: ThemeData(
-      colorScheme:
-          ColorScheme.fromSeed(
-            seedColor: const Color(0xFF397A9F),
-            brightness: Brightness.dark,
-          ).copyWith(
-            primary: const Color(0xFF5C97B9),
-            onPrimary: const Color(0xFF06111E),
-            secondary: const Color(0xFF789AAE),
-            surface: const Color(0xFF0A1A29),
-            onSurface: const Color(0xFFE6EEF3),
-            outline: const Color(0xFF284A60),
-          ),
-      scaffoldBackgroundColor: const Color(0xFF06111E),
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFFA44C2E),
+      ).copyWith(
+        primary: const Color(0xFFA44C2E),
+        onPrimary: Colors.white,
+        secondary: const Color(0xFF7A5A4A),
+        surface: const Color(0xFFFFFCF9),
+        onSurface: const Color(0xFF17212B),
+        outline: const Color(0xFFD5DAD8),
+      ),
+      scaffoldBackgroundColor: const Color(0xFFF7F5F0),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF081725),
-        foregroundColor: Colors.white,
+        backgroundColor: Color(0xFFF7F5F0),
+        foregroundColor: Color(0xFF17212B),
       ),
       cardTheme: CardThemeData(
-        color: const Color(0xFF0A1A29),
+        color: const Color(0xFFFFFCF9),
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Color(0xFF284A60)),
+          side: const BorderSide(color: Color(0xFFD5DAD8)),
         ),
       ),
       inputDecorationTheme: const InputDecorationTheme(
         filled: true,
-        fillColor: Color(0xFF071522),
-        labelStyle: TextStyle(color: Color(0xFFB7CAD6)),
-        suffixStyle: TextStyle(color: Color(0xFF91AABD)),
+        fillColor: Color(0xFFFFFFFF),
+        labelStyle: TextStyle(color: Color(0xFF52616B)),
+        suffixStyle: TextStyle(color: Color(0xFF52616B)),
         enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFF284A60)),
+          borderSide: BorderSide(color: Color(0xFFD5DAD8)),
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFF5C97B9), width: 1.5),
+          borderSide: BorderSide(color: Color(0xFFA44C2E), width: 1.5),
         ),
       ),
-      textTheme: ThemeData.dark().textTheme.apply(
-        bodyColor: const Color(0xFFD7E3EA),
-        displayColor: const Color(0xFFF1F6F8),
+      textTheme: ThemeData.light().textTheme.apply(
+        bodyColor: const Color(0xFF17212B),
+        displayColor: const Color(0xFF17212B),
       ),
       listTileTheme: const ListTileThemeData(
-        iconColor: Color(0xFF92B6CA),
-        textColor: Color(0xFFE6EEF3),
-        subtitleTextStyle: TextStyle(color: Color(0xFF9CB2C0)),
+        iconColor: Color(0xFF52616B),
+        textColor: Color(0xFF17212B),
+        subtitleTextStyle: TextStyle(color: Color(0xFF52616B)),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
-              ? const Color(0xFFC8DDE8)
+              ? const Color(0xFFFFFFFF)
               : const Color(0xFF9BAAB2),
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
-              ? const Color(0xFF376C8A)
-              : const Color(0xFF34414A),
+              ? const Color(0xFFA44C2E)
+              : const Color(0xFFD5DAD8),
         ),
       ),
     ),
@@ -406,8 +404,8 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                   ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                     leading: CircleAvatar(
-                      backgroundColor: const Color(0xFF17364B),
-                      foregroundColor: const Color(0xFF9EC6D9),
+                      backgroundColor: const Color(0xFFF1E5DF),
+                      foregroundColor: const Color(0xFF17212B),
                       child: Icon(orderTypeIconFor(type.icon)),
                     ),
                     title: Text(
@@ -671,7 +669,7 @@ class _OrderTypeIconChoice extends StatelessWidget {
     selected: selected,
     label: option.label,
     child: Material(
-      color: selected ? const Color(0xFF28566D) : const Color(0xFF12283A),
+      color: selected ? const Color(0xFFF1D8CE) : const Color(0xFFFFFFFF),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -686,9 +684,7 @@ class _OrderTypeIconChoice extends StatelessWidget {
               children: [
                 Icon(
                   option.icon,
-                  color: selected
-                      ? const Color(0xFFC5E0EA)
-                      : const Color(0xFFCFDEE5),
+                  color: const Color(0xFF17212B),
                 ),
                 const SizedBox(height: 7),
                 Text(
@@ -696,9 +692,7 @@ class _OrderTypeIconChoice extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: selected
-                        ? const Color(0xFFC5E0EA)
-                        : const Color(0xFFCFDEE5),
+                    color: const Color(0xFF17212B),
                     fontSize: 11,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                   ),

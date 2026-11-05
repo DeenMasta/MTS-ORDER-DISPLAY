@@ -11,11 +11,9 @@ import 'kitchen_history_screen.dart';
 import 'kitchen_settings_screen.dart';
 import 'slanted_timer_clipper.dart';
 
-const _appChromeSurface = Color(0xFF06111E);
-const _appChromeElevated = Color(0xFF0C2134);
-const _appChromeBorder = Color(0xFF2D668D);
-const _appChromeAccent = Color(0xFF64CFFF);
-const _appChromeMuted = Color(0xFFA8C7DA);
+const _boardBackground = Color(0xFFF7F5F0);
+const _boardForeground = Color(0xFF17212B);
+const _boardMuted = Color(0xFF52616B);
 
 class KitchenBoardScreen extends StatefulWidget {
   const KitchenBoardScreen({
@@ -70,7 +68,7 @@ class _KitchenBoardScreenState extends State<KitchenBoardScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     key: _scaffoldKey,
-    backgroundColor: const Color(0xFF030B15),
+    backgroundColor: _boardBackground,
     endDrawer: _KitchenSideMenu(
       onHistory: _openHistory,
       onSettings: _openSettings,
@@ -98,13 +96,8 @@ class _BrandPatternBackground extends StatelessWidget {
   const _BrandPatternBackground();
 
   @override
-  Widget build(BuildContext context) => Stack(
-    fit: StackFit.expand,
-    children: [
-      Image.asset('assets/images/kds_background.png', fit: BoxFit.cover),
-      const ColoredBox(color: Color(0x9900060D)),
-    ],
-  );
+  Widget build(BuildContext context) =>
+      Image.asset('assets/images/kds_background.png', fit: BoxFit.cover);
 }
 
 class _KitchenBoardBody extends StatelessWidget {
@@ -173,7 +166,7 @@ class _KitchenBoardBody extends StatelessWidget {
                     ? const Center(
                         child: Text(
                           'No active kitchen tickets.',
-                          style: TextStyle(color: Colors.white70, fontSize: 18),
+                          style: TextStyle(color: _boardMuted, fontSize: 18),
                         ),
                       )
                     : _TicketPager(
@@ -211,9 +204,9 @@ class _ConnectionStatus extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
     decoration: BoxDecoration(
-      color: const Color(0xFF152536),
+      color: const Color(0xFFFFFCF9),
       borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: const Color(0xFF4A90C2)),
+      border: Border.all(color: const Color(0xFFD5DAD8)),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
@@ -232,7 +225,7 @@ class _ConnectionStatus extends StatelessWidget {
                 : 'Confirm this code in POS: $code',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Colors.white, fontSize: 16),
+            style: const TextStyle(color: _boardForeground, fontSize: 16),
           ),
         ),
       ],
@@ -256,13 +249,9 @@ class _Header extends StatelessWidget {
     height: compact ? 52 : 58,
     padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 16),
     decoration: BoxDecoration(
-      gradient: const LinearGradient(
-        colors: [Color(0xEE061522), Color(0xEE0B2438)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
+      color: _boardBackground,
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: _appChromeBorder),
+      border: Border.all(color: const Color(0xFFD5DAD8)),
       boxShadow: const [
         BoxShadow(
           color: Color(0x33000000),
@@ -276,7 +265,7 @@ class _Header extends StatelessWidget {
         Text(
           'Orders: ${orderCount.toString().padLeft(2, '0')}',
           style: TextStyle(
-            color: Colors.white,
+            color: _boardForeground,
             fontSize: compact ? 12 : 14,
             fontWeight: FontWeight.w700,
           ),
@@ -292,7 +281,7 @@ class _Header extends StatelessWidget {
           onPressed: onOpenMenu,
           icon: Icon(
             Icons.menu_rounded,
-            color: Colors.white,
+            color: _boardForeground,
             size: compact ? 24 : 28,
           ),
         ),
@@ -316,7 +305,7 @@ class _KitchenSideMenu extends StatelessWidget {
     );
     return Drawer(
       width: width,
-      backgroundColor: _appChromeSurface,
+      backgroundColor: _boardBackground,
       surfaceTintColor: Colors.transparent,
       child: SafeArea(
         child: Column(
@@ -325,12 +314,7 @@ class _KitchenSideMenu extends StatelessWidget {
             Container(
               padding: const EdgeInsets.fromLTRB(22, 22, 16, 20),
               decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF10324C), _appChromeSurface],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                border: Border(bottom: BorderSide(color: _appChromeBorder)),
+                border: Border(bottom: BorderSide(color: Color(0xFFD5DAD8))),
               ),
               child: Row(
                 children: [
@@ -339,7 +323,10 @@ class _KitchenSideMenu extends StatelessWidget {
                   IconButton(
                     tooltip: 'Close menu',
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: _boardForeground,
+                    ),
                   ),
                 ],
               ),
@@ -349,7 +336,7 @@ class _KitchenSideMenu extends StatelessWidget {
               child: Text(
                 'DISPLAY MENU',
                 style: TextStyle(
-                  color: _appChromeMuted,
+                  color: _boardMuted,
                   fontWeight: FontWeight.w800,
                   fontSize: 11,
                   letterSpacing: 1.2,
@@ -364,7 +351,7 @@ class _KitchenSideMenu extends StatelessWidget {
             ),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Divider(color: _appChromeBorder, height: 1),
+              child: Divider(color: Color(0xFFD5DAD8), height: 1),
             ),
             _SideMenuItem(
               icon: Icons.settings_outlined,
@@ -377,7 +364,7 @@ class _KitchenSideMenu extends StatelessWidget {
               padding: EdgeInsets.all(22),
               child: Text(
                 'Order Display System',
-                style: TextStyle(color: _appChromeMuted, fontSize: 12),
+                style: TextStyle(color: _boardMuted, fontSize: 12),
               ),
             ),
           ],
@@ -407,17 +394,20 @@ class _SideMenuItem extends StatelessWidget {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: _appChromeElevated,
+        color: const Color(0xFFE5EBE7),
         borderRadius: BorderRadius.circular(11),
       ),
-      child: Icon(icon, color: _appChromeAccent),
+      child: Icon(icon, color: _boardForeground),
     ),
     title: Text(
       label,
-      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+      style: const TextStyle(
+        color: _boardForeground,
+        fontWeight: FontWeight.w700,
+      ),
     ),
-    subtitle: Text(detail, style: const TextStyle(color: _appChromeMuted)),
-    trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF83C9ED)),
+    subtitle: Text(detail, style: const TextStyle(color: _boardMuted)),
+    trailing: const Icon(Icons.chevron_right_rounded, color: _boardMuted),
     onTap: onTap,
   );
 }
@@ -903,7 +893,7 @@ class _Pager extends StatelessWidget {
     children: [
       IconButton(
         onPressed: viewModel.page == 0 ? null : viewModel.showPreviousPage,
-        icon: const Icon(Icons.chevron_left, color: Colors.white),
+        icon: const Icon(Icons.chevron_left, color: _boardForeground),
       ),
       Expanded(
         child: FittedBox(
@@ -919,9 +909,9 @@ class _Pager extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: index == viewModel.page
-                      ? Colors.white
+                      ? _boardForeground
                       : Colors.transparent,
-                  border: Border.all(color: Colors.white),
+                  border: Border.all(color: _boardForeground),
                 ),
               ),
             ),
@@ -932,7 +922,7 @@ class _Pager extends StatelessWidget {
         onPressed: viewModel.page >= viewModel.pageCount - 1
             ? null
             : viewModel.showNextPage,
-        icon: const Icon(Icons.chevron_right, color: Colors.white),
+        icon: const Icon(Icons.chevron_right, color: _boardForeground),
       ),
     ],
   );
@@ -960,14 +950,14 @@ class _StatusMessage extends StatelessWidget {
       children: [
         Text(
           message,
-          style: const TextStyle(color: Colors.white, fontSize: 20),
+          style: const TextStyle(color: _boardForeground, fontSize: 20),
         ),
         if (detail case final detail?) ...[
           const SizedBox(height: 8),
           Text(
             detail,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white70),
+            style: const TextStyle(color: _boardMuted),
           ),
         ],
         if (onAction != null) ...[

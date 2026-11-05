@@ -41,20 +41,18 @@ class _PairingScreenState extends State<PairingScreen> {
   @override
   Widget build(BuildContext context) => Theme(
     data: ThemeData(
-      brightness: Brightness.dark,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF00A8E8),
-        brightness: Brightness.dark,
+        seedColor: const Color(0xFFA44C2E),
       ),
       useMaterial3: true,
       inputDecorationTheme: const InputDecorationTheme(
         filled: true,
-        fillColor: Color(0xFF081B2B),
+        fillColor: Color(0xFFFFFFFF),
         border: OutlineInputBorder(),
       ),
     ),
     child: Scaffold(
-      backgroundColor: const Color(0xFF030B15),
+      backgroundColor: const Color(0xFFF7F5F0),
       body: Stack(
         children: [
           const Positioned.fill(child: _BrandPatternBackground()),
@@ -98,10 +96,7 @@ class _BrandPatternBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Stack(
     fit: StackFit.expand,
-    children: [
-      Image.asset('assets/images/kds_background.png', fit: BoxFit.cover),
-      const ColoredBox(color: Color(0x9900060D)),
-    ],
+    children: [Image.asset('assets/images/kds_background.png', fit: BoxFit.cover)],
   );
 }
 
@@ -130,9 +125,9 @@ class _PairingCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(24),
     decoration: BoxDecoration(
-      color: const Color(0xED081B2B),
+      color: const Color(0xF2FFFCF9),
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: const Color(0xFF1B9ED8)),
+      border: Border.all(color: const Color(0xFFD5DAD8)),
       boxShadow: const [
         BoxShadow(
           color: Color(0x66000000),
@@ -160,7 +155,7 @@ class _PairingCard extends StatelessWidget {
               : 'Connect this screen to your POS in two quick steps.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: Colors.white70,
+            color: const Color(0xFF52616B),
           ),
         ),
         const SizedBox(height: 28),
@@ -218,7 +213,7 @@ class _SetupForm extends StatelessWidget {
       ),
       const Padding(
         padding: EdgeInsets.symmetric(vertical: 24),
-        child: Divider(color: Color(0xFF31506A)),
+        child: Divider(color: Color(0xFFD5DAD8)),
       ),
       const _StepHeading(number: '2', title: 'Name this screen'),
       const SizedBox(height: 12),
@@ -268,9 +263,9 @@ class _WaitingForApproval extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: const Color(0xFF102C43),
+          color: const Color(0xFFFFFFFF),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF1B9ED8)),
+          border: Border.all(color: const Color(0xFFD5DAD8)),
         ),
         child: Column(
           children: [
@@ -286,7 +281,7 @@ class _WaitingForApproval extends StatelessWidget {
               const Text(
                 'PAIRING CODE',
                 style: TextStyle(
-                  color: Color(0xFF9BCDE8),
+                  color: Color(0xFF52616B),
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.2,
@@ -337,13 +332,13 @@ class _StepHeading extends StatelessWidget {
         height: 28,
         alignment: Alignment.center,
         decoration: const BoxDecoration(
-          color: Color(0xFF00A8E8),
+          color: Color(0xFFA44C2E),
           shape: BoxShape.circle,
         ),
         child: Text(
           number,
           style: const TextStyle(
-            color: Color(0xFF00111D),
+            color: Colors.white,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -364,13 +359,13 @@ class _Hint extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Icon(icon, size: 18, color: const Color(0xFF9BCDE8)),
+      Icon(icon, size: 18, color: const Color(0xFF52616B)),
       const SizedBox(width: 8),
       Expanded(
         child: Text(
           text,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Colors.white70,
+            color: const Color(0xFF52616B),
           ),
         ),
       ),
@@ -387,7 +382,7 @@ class _ErrorMessage extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: const Color(0xFF4A1B24),
+      color: const Color(0xFFFFE8E8),
       borderRadius: BorderRadius.circular(12),
       border: Border.all(color: Theme.of(context).colorScheme.error),
     ),

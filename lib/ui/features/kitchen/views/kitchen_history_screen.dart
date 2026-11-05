@@ -26,7 +26,7 @@ class _KitchenHistoryScreenState extends State<KitchenHistoryScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFF030B15),
+    backgroundColor: const Color(0xFFF7F5F0),
     body: Stack(
       children: [
         Positioned.fill(
@@ -35,7 +35,6 @@ class _KitchenHistoryScreenState extends State<KitchenHistoryScreen> {
             fit: BoxFit.cover,
           ),
         ),
-        const Positioned.fill(child: ColoredBox(color: Color(0xCC00060D))),
         SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -51,7 +50,7 @@ class _KitchenHistoryScreenState extends State<KitchenHistoryScreen> {
                           tooltip: 'Back',
                           onPressed: () => Navigator.of(context).pop(),
                           icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                          color: Colors.white,
+                          color: const Color(0xFF17212B),
                         ),
                         SizedBox(width: compact ? 2 : 8),
                         Expanded(
@@ -61,7 +60,7 @@ class _KitchenHistoryScreenState extends State<KitchenHistoryScreen> {
                               Text(
                                 'Order history',
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: const Color(0xFF17212B),
                                   fontSize: compact ? 18 : 22,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -72,7 +71,7 @@ class _KitchenHistoryScreenState extends State<KitchenHistoryScreen> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  color: Color(0xFFAFC5D6),
+                                  color: Color(0xFF52616B),
                                   fontSize: 12,
                                 ),
                               ),
@@ -95,7 +94,7 @@ class _KitchenHistoryScreenState extends State<KitchenHistoryScreen> {
                       final groups = widget.viewModel.todayHistoryGroups;
                       if (groups.isEmpty) return const _EmptyHistory();
                       return RefreshIndicator(
-                        color: const Color(0xFF28B9ED),
+                        color: const Color(0xFFA44C2E),
                         onRefresh: widget.viewModel.loadTodayHistory,
                         child: ListView.separated(
                           physics: const AlwaysScrollableScrollPhysics(),
@@ -134,16 +133,16 @@ class _EmptyHistory extends StatelessWidget {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.receipt_long_outlined, color: Color(0xFF5A7D96), size: 42),
+        Icon(Icons.receipt_long_outlined, color: Color(0xFF52616B), size: 42),
         SizedBox(height: 12),
         Text(
           'No orders in today’s history.',
-          style: TextStyle(color: Colors.white, fontSize: 16),
+          style: TextStyle(color: Color(0xFF17212B), fontSize: 16),
         ),
         SizedBox(height: 6),
         Text(
           'Stored receipts are kept on this device.',
-          style: TextStyle(color: Color(0xFFAFC5D6), fontSize: 12),
+          style: TextStyle(color: Color(0xFF52616B), fontSize: 12),
         ),
       ],
     ),
@@ -170,9 +169,9 @@ class _HistoryReceipt extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: const Color(0xEE0B2031),
+          color: const Color(0xFFFFFCF9),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF24516F)),
+          border: Border.all(color: const Color(0xFFD5DAD8)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,7 +181,7 @@ class _HistoryReceipt extends StatelessWidget {
                 Text(
                   '#${ticket.orderNumber}',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: const Color(0xFF17212B),
                     fontWeight: FontWeight.w800,
                     fontSize: 18,
                   ),
@@ -195,12 +194,12 @@ class _HistoryReceipt extends StatelessWidget {
                 Text(
                   _timeLabel(ticket.createdAt.toLocal()),
                   style: const TextStyle(
-                    color: Color(0xFF7BD5F3),
+                    color: Color(0xFFA44C2E),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Icon(Icons.restore_rounded, color: Color(0xFF6B9AB0)),
+                const Icon(Icons.restore_rounded, color: Color(0xFF52616B)),
               ],
             ),
             const SizedBox(height: 6),
@@ -211,14 +210,14 @@ class _HistoryReceipt extends StatelessWidget {
                   'Table $table',
               ].join('  •  '),
               style: const TextStyle(
-                color: Color(0xFFAFC5D6),
+                color: Color(0xFF52616B),
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
               ),
             ),
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 10),
-              child: Divider(color: Color(0xFF24445A), height: 1),
+              child: Divider(color: Color(0xFFD5DAD8), height: 1),
             ),
             for (final item in items)
               Padding(
@@ -226,7 +225,7 @@ class _HistoryReceipt extends StatelessWidget {
                 child: Text(
                   '${item.displayQuantity}x  ${item.name}',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF17212B),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -280,7 +279,7 @@ class KitchenHistoryDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final ticket = tickets.first;
     return Scaffold(
-      backgroundColor: const Color(0xFF030B15),
+      backgroundColor: const Color(0xFFF7F5F0),
       body: Stack(
         children: [
           Positioned.fill(
@@ -289,7 +288,6 @@ class KitchenHistoryDetailScreen extends StatelessWidget {
               fit: BoxFit.cover,
             ),
           ),
-          const Positioned.fill(child: ColoredBox(color: Color(0xCC00060D))),
           SafeArea(
             child: Column(
               children: [
@@ -304,7 +302,7 @@ class KitchenHistoryDetailScreen extends StatelessWidget {
                             tooltip: 'Back to order history',
                             onPressed: () => Navigator.of(context).pop(),
                             icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                            color: Colors.white,
+                            color: const Color(0xFF17212B),
                           ),
                           const SizedBox(width: 4),
                           Expanded(
@@ -312,7 +310,7 @@ class KitchenHistoryDetailScreen extends StatelessWidget {
                               'Order #${ticket.orderNumber}',
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                color: Colors.white,
+                                color: const Color(0xFF17212B),
                                 fontSize: compact ? 17 : 20,
                                 fontWeight: FontWeight.w800,
                               ),
@@ -365,7 +363,7 @@ class KitchenHistoryDetailScreen extends StatelessWidget {
                                     else
                                       const _HistoryDetailStatus(
                                         label: 'IN HISTORY',
-                                        color: Color(0xFF157AA6),
+                                        color: Color(0xFFA44C2E),
                                       ),
                                   ],
                                 ),

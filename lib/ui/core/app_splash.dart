@@ -55,20 +55,14 @@ class _MysztechSplash extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     body: Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF03111E),
+        color: Color(0xFFF7F5F0),
         image: DecorationImage(
           image: AssetImage('assets/images/kds_background.png'),
           fit: BoxFit.cover,
         ),
       ),
       child: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0x52010A13), Color(0xC804101C)],
-          ),
-        ),
+        decoration: const BoxDecoration(),
         child: SafeArea(
           child: Center(
             child: LayoutBuilder(
@@ -94,7 +88,7 @@ class _MysztechSplash extends StatelessWidget {
                           'KITCHEN DISPLAY',
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
-                                color: const Color(0xFFD8E9F2),
+                                color: const Color(0xFF17212B),
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 3.4,
                               ),
@@ -104,7 +98,7 @@ class _MysztechSplash extends StatelessWidget {
                       const Text(
                         'Preparing your kitchen workspace',
                         style: TextStyle(
-                          color: Color(0xFF9EB9C9),
+                          color: Color(0xFF52616B),
                           fontSize: 13,
                         ),
                       ),
@@ -115,8 +109,8 @@ class _MysztechSplash extends StatelessWidget {
                           borderRadius: BorderRadius.all(Radius.circular(99)),
                           child: LinearProgressIndicator(
                             minHeight: 4,
-                            color: Color(0xFF38A8D2),
-                            backgroundColor: Color(0x663F6277),
+                            color: Color(0xFFA44C2E),
+                            backgroundColor: Color(0x33A44C2E),
                           ),
                         ),
                       ),
