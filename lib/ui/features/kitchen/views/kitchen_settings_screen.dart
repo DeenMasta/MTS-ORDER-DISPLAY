@@ -233,15 +233,85 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
     }
   }
 
+  Future<void> _chooseAlertTemplate({required bool urgent}) async {
+    final selected = await showModalBottomSheet<KdsAlertTone>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        final activeTone = urgent
+            ? _draft.urgentOrderTone
+            : _draft.newOrderTone;
+        return SafeArea(
+          child: SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.78,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 4, 24, 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Choose ${urgent ? 'urgent-order' : 'new-order'} sound',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    children: [
+                      for (final tone in KdsAlertTone.templatesFor(
+                        urgent: urgent,
+                      ))
+                        ListTile(
+                          leading: Icon(_alertToneIcon(tone)),
+                          title: Text(tone.label),
+                          subtitle: Text(tone.description),
+                          trailing: tone == activeTone
+                              ? const Icon(Icons.check_circle_rounded)
+                              : null,
+                          onTap: () => Navigator.pop(context, tone),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (!mounted || selected == null) return;
+    _update(
+      urgent
+          ? _draft.copyWith(urgentOrderTone: selected)
+          : _draft.copyWith(newOrderTone: selected),
+    );
+    _message('${selected.label} selected. Save changes to use it.');
+  }
+
   Future<void> _testAlertSound({required bool urgent}) async {
     try {
       await (urgent
-          ? widget.viewModel.testUrgentOrderSound()
-          : widget.viewModel.testNewOrderSound());
+          ? widget.viewModel.testUrgentOrderSound(tone: _draft.urgentOrderTone)
+          : widget.viewModel.testNewOrderSound(tone: _draft.newOrderTone));
     } on Object {
-      _message('Unable to play the built-in alert sound.');
+      _message('Unable to play the alert sound.');
     }
   }
+
+  IconData _alertToneIcon(KdsAlertTone tone) => switch (tone) {
+    KdsAlertTone.chime => Icons.music_note_rounded,
+    KdsAlertTone.bell => Icons.notifications_outlined,
+    KdsAlertTone.pulse => Icons.graphic_eq_rounded,
+    KdsAlertTone.call => Icons.ring_volume_outlined,
+    KdsAlertTone.alert => Icons.notification_important_outlined,
+    KdsAlertTone.priority => Icons.campaign_outlined,
+    KdsAlertTone.urgentPulse => Icons.notifications_active_outlined,
+    KdsAlertTone.urgentCall => Icons.ring_volume_rounded,
+  };
 
   @override
   Widget build(BuildContext context) => Theme(
@@ -340,9 +410,15 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                       foregroundColor: const Color(0xFF9EC6D9),
                       child: Icon(orderTypeIconFor(type.icon)),
                     ),
-                    title: Text(type.name),
+                    title: Text(
+                      type.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     subtitle: Text(
                       '${_draft.isOrderTypeVisible(id: type.id, name: type.name) ? 'Shown on dashboard' : 'Hidden from dashboard'} \u00b7 ${orderTypeIconOptionFor(type.icon).label}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -365,7 +441,6 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                           onPressed: () => _removeOrderType(type),
                           icon: const Icon(Icons.delete_outline_rounded),
                         ),
-                        const Icon(Icons.chevron_right_rounded),
                       ],
                     ),
                     onTap: () => _selectOrderTypeIcon(type),
@@ -420,11 +495,17 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                 onChanged: (value) =>
                     _update(_draft.copyWith(newOrderAlert: value)),
               ),
-              const ListTile(
+              ListTile(
                 contentPadding: EdgeInsets.symmetric(horizontal: 16),
-                leading: Icon(Icons.notifications_active_outlined),
-                title: Text('New-order sound'),
-                subtitle: Text('Built-in two-note kitchen chime.'),
+                leading: const Icon(Icons.notifications_active_outlined),
+                title: const Text('New-order sound'),
+                subtitle: Text(
+                  'Template: ${_draft.newOrderTone.label}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => _chooseAlertTemplate(urgent: false),
               ),
               SwitchListTile(
                 title: const Text('Urgent-order alert'),
@@ -435,15 +516,23 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                 onChanged: (value) =>
                     _update(_draft.copyWith(urgentOrderAlert: value)),
               ),
-              const ListTile(
+              ListTile(
                 contentPadding: EdgeInsets.symmetric(horizontal: 16),
-                leading: Icon(Icons.crisis_alert_outlined),
-                title: Text('Urgent-order sound'),
-                subtitle: Text('Built-in three-note urgent alert.'),
+                leading: const Icon(Icons.crisis_alert_outlined),
+                title: const Text('Urgent-order sound'),
+                subtitle: Text(
+                  'Template: ${_draft.urgentOrderTone.label}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => _chooseAlertTemplate(urgent: true),
               ),
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 4, 16, 12),
-                child: Text('Alert loudness follows the device sound level.'),
+                child: Text(
+                  'Choose a KDS sound template for each event. Alert loudness follows the device sound level.',
+                ),
               ),
               Align(
                 alignment: Alignment.centerLeft,

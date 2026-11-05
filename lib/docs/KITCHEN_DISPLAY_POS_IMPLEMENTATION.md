@@ -1,4 +1,4 @@
-# Kitchen Display POS Integration
+# Order Display POS Integration
 
 This is the POS implementation of `KITCHEN_DISPLAY_API.md`. KDS traffic stays
 on the outlet LAN; Laravel Cloud is only used for display configuration and

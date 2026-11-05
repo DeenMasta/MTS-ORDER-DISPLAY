@@ -2,7 +2,7 @@ import 'package:flutter/services.dart';
 
 import '../../domain/models/kds_settings.dart';
 
-/// Platform boundary for the local sounds used by the kitchen display.
+/// Platform boundary for the local sounds used by the order display.
 abstract interface class KitchenAlertPlayer {
   Future<void> play(KdsAlertTone tone);
 
@@ -26,11 +26,8 @@ class BuiltInKitchenAlertPlayer implements KitchenAlertPlayer {
 
   @override
   Future<void> play(KdsAlertTone tone) async {
-    final method = tone == KdsAlertTone.chime
-        ? 'playNewOrder'
-        : 'playUrgentOrder';
     try {
-      await _channel.invokeMethod<void>(method);
+      await _channel.invokeMethod<void>('playTemplateSound', tone.name);
     } on MissingPluginException {
       await _playSystemFallback(tone);
     } on PlatformException {
@@ -40,11 +37,16 @@ class BuiltInKitchenAlertPlayer implements KitchenAlertPlayer {
 
   Future<void> _playSystemFallback(KdsAlertTone tone) async {
     try {
-      await SystemSound.play(
-        tone == KdsAlertTone.chime
-            ? SystemSoundType.click
-            : SystemSoundType.alert,
-      );
+      await SystemSound.play(switch (tone) {
+        KdsAlertTone.chime ||
+        KdsAlertTone.bell ||
+        KdsAlertTone.pulse ||
+        KdsAlertTone.call => SystemSoundType.click,
+        KdsAlertTone.alert ||
+        KdsAlertTone.priority ||
+        KdsAlertTone.urgentPulse ||
+        KdsAlertTone.urgentCall => SystemSoundType.alert,
+      });
     } on MissingPluginException {
       // Alerts are optional on a platform without a system sound channel.
     } on PlatformException {

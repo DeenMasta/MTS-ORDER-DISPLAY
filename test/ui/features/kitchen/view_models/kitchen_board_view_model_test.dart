@@ -209,7 +209,7 @@ void main() {
   });
 
   test(
-    'plays the built-in new-order chime once for a received order',
+    'plays the selected new-order template once for a received order',
     () async {
       final repository = _FakeKitchenRepository([_ticket('1', 'Dine In')]);
       final alertPlayer = _RecordingKitchenAlertPlayer();
@@ -233,13 +233,13 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       await Future<void>.delayed(Duration.zero);
 
-      expect(alertPlayer.tones, [KdsAlertTone.chime]);
+      expect(alertPlayer.tones, [KdsAlertTone.alert]);
 
       repository.notifyChanged();
       await Future<void>.delayed(Duration.zero);
       await Future<void>.delayed(Duration.zero);
 
-      expect(alertPlayer.tones, [KdsAlertTone.chime]);
+      expect(alertPlayer.tones, [KdsAlertTone.alert]);
     },
   );
 
@@ -260,6 +260,20 @@ void main() {
       expect(alertPlayer.tones, [KdsAlertTone.chime, KdsAlertTone.alert]);
     },
   );
+
+  test('previews the selected template when testing an alert', () async {
+    final alertPlayer = _RecordingKitchenAlertPlayer();
+    final viewModel = KitchenBoardViewModel(
+      repository: _FakeKitchenRepository([]),
+      settingsRepository: _FakeSettingsRepository(),
+      alertPlayer: alertPlayer,
+    );
+    addTearDown(viewModel.dispose);
+
+    await viewModel.testNewOrderSound(tone: KdsAlertTone.bell);
+
+    expect(alertPlayer.tones, [KdsAlertTone.bell]);
+  });
 
   test('finishes a receipt when its last item is crossed', () async {
     final ticket = KitchenTicket(

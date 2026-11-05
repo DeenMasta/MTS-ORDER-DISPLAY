@@ -108,7 +108,7 @@ class PendingPairingRepository extends TrackingPairingRepository {
     const DisplaySession(
       displayId: 'display-1',
       posIp: '192.168.1.10',
-      displayName: 'Kitchen Display',
+      displayName: 'Order Display',
     ),
   );
 }

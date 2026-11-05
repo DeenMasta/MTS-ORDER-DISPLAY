@@ -6,14 +6,14 @@ import 'package:mysztech_order_display/domain/models/kds_settings.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('sends distinct built-in alert requests to Android', () async {
+  test('sends each selected sound template to Android', () async {
     const channel = MethodChannel(
       'com.mysztechnology.mysztech_order_display/kitchen_alerts',
     );
-    final methods = <String>[];
+    final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
-          methods.add(call.method);
+          calls.add(call);
           return null;
         });
     addTearDown(
@@ -22,9 +22,14 @@ void main() {
     );
 
     final player = BuiltInKitchenAlertPlayer(channel: channel);
-    await player.play(KdsAlertTone.chime);
-    await player.play(KdsAlertTone.alert);
+    for (final tone in KdsAlertTone.values) {
+      await player.play(tone);
+    }
 
-    expect(methods, ['playNewOrder', 'playUrgentOrder']);
+    expect(calls.map((call) => call.method), everyElement('playTemplateSound'));
+    expect(
+      calls.map((call) => call.arguments),
+      KdsAlertTone.values.map((tone) => tone.name).toList(),
+    );
   });
 }

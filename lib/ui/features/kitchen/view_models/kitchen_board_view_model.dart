@@ -189,9 +189,11 @@ class KitchenBoardViewModel extends ChangeNotifier {
     return milliseconds <= 0 ? 0 : (milliseconds / 1000).ceil();
   }
 
-  Future<void> testNewOrderSound() => _alertPlayer.play(KdsAlertTone.chime);
+  Future<void> testNewOrderSound({KdsAlertTone? tone}) =>
+      _alertPlayer.play(tone ?? _settings.newOrderTone);
 
-  Future<void> testUrgentOrderSound() => _alertPlayer.play(KdsAlertTone.alert);
+  Future<void> testUrgentOrderSound({KdsAlertTone? tone}) =>
+      _alertPlayer.play(tone ?? _settings.urgentOrderTone);
 
   Future<void> start(DisplaySession session) async {
     _changes ??= _repository.changes.listen(
@@ -452,9 +454,12 @@ class KitchenBoardViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> _playAlert(KdsAlertTone tone) async {
+  Future<void> _playAlert(KdsAlertTone eventTone) async {
     try {
-      await _alertPlayer.play(tone);
+      final template = eventTone == KdsAlertTone.chime
+          ? _settings.newOrderTone
+          : _settings.urgentOrderTone;
+      await _alertPlayer.play(template);
     } on Object {
       // A local audio issue must never prevent POS orders from rendering.
     }

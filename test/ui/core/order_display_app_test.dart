@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mysztech_order_display/data/repositories/device_identity_repository.dart';
 import 'package:mysztech_order_display/data/repositories/display_settings_repository.dart';
@@ -10,12 +11,29 @@ import 'package:mysztech_order_display/domain/models/display_session.dart';
 import 'package:mysztech_order_display/domain/models/kds_settings.dart';
 import 'package:mysztech_order_display/domain/models/kitchen_ticket.dart';
 import 'package:mysztech_order_display/domain/models/pairing.dart';
+import 'package:mysztech_order_display/ui/core/app_splash.dart';
 import 'package:mysztech_order_display/ui/core/order_display_app.dart';
 import 'package:mysztech_order_display/ui/features/kitchen/view_models/kitchen_board_view_model.dart';
 import 'package:mysztech_order_display/ui/features/pairing/view_models/pairing_view_model.dart';
 import 'package:mysztech_order_display/ui/features/session/view_models/session_view_model.dart';
 
 void main() {
+  testWidgets('fits the splash screen on narrow displays', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(180, 360));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: AppSplash(
+          minimumDuration: Duration(days: 1),
+          child: SizedBox.shrink(),
+        ),
+      ),
+    );
+
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('shows setup when no display session exists', (tester) async {
     final viewModel = SessionViewModel(
       sessionRepository: EmptyDisplaySessionRepository(),
@@ -36,9 +54,10 @@ void main() {
       ),
     );
     await viewModel.initialize();
-    await tester.pump();
+    await tester.pump(AppSplash.defaultMinimumDuration);
+    await tester.pumpAndSettle();
 
-    expect(find.text('Set up your kitchen display'), findsOneWidget);
+    expect(find.text('Set up your order display'), findsOneWidget);
   });
 }
 

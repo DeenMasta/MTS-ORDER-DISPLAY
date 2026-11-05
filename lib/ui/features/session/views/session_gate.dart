@@ -24,7 +24,7 @@ class SessionGate extends StatelessWidget {
       listenable: sessionViewModel,
       builder: (context, child) => switch (sessionViewModel.status) {
         SessionStatus.loading => const _StatusScreen(
-          title: 'Starting kitchen display',
+          title: 'Starting order display',
           child: CircularProgressIndicator(),
         ),
         SessionStatus.unpaired => PairingScreen(
@@ -37,7 +37,7 @@ class SessionGate extends StatelessWidget {
           onChangeConnection: sessionViewModel.changeConnection,
         ),
         SessionStatus.error => _StatusScreen(
-          title: 'Unable to start kitchen display',
+          title: 'Unable to start order display',
           child: FilledButton(
             onPressed: sessionViewModel.initialize,
             child: const Text('Try again'),

@@ -1,19 +1,65 @@
 enum KdsAlertTone {
   chime,
-  alert;
+  bell,
+  pulse,
+  call,
+  alert,
+  priority,
+  urgentPulse,
+  urgentCall;
+
+  /// Each urgent template shares its musical motif with the matching new-order
+  /// template, then repeats it more quickly with a higher final note.
+  static const newOrderTemplates = <KdsAlertTone>[chime, bell, pulse, call];
+  static const urgentOrderTemplates = <KdsAlertTone>[
+    alert,
+    priority,
+    urgentPulse,
+    urgentCall,
+  ];
+
+  static List<KdsAlertTone> templatesFor({required bool urgent}) =>
+      urgent ? urgentOrderTemplates : newOrderTemplates;
 
   static KdsAlertTone fromStorage(Object? value, KdsAlertTone fallback) =>
       switch (value) {
         'chime' => chime,
+        'bell' => bell,
+        'pulse' => pulse,
+        'call' => call,
         'alert' => alert,
+        'priority' => priority,
+        'urgentPulse' => urgentPulse,
+        'urgentCall' => urgentCall,
         _ => fallback,
       };
 }
 
 extension KdsAlertToneLabel on KdsAlertTone {
   String get label => switch (this) {
-    KdsAlertTone.chime => 'Gentle chime',
-    KdsAlertTone.alert => 'Attention alert',
+    KdsAlertTone.chime => 'Bright chime',
+    KdsAlertTone.bell => 'Warm bell',
+    KdsAlertTone.pulse => 'Quick pulse',
+    KdsAlertTone.call => 'Kitchen call',
+    KdsAlertTone.alert => 'Chime priority',
+    KdsAlertTone.priority => 'Bell priority',
+    KdsAlertTone.urgentPulse => 'Pulse priority',
+    KdsAlertTone.urgentCall => 'Call priority',
+  };
+
+  String get description => switch (this) {
+    KdsAlertTone.chime => 'A clear three-note arrival chime.',
+    KdsAlertTone.bell => 'A warm counter-bell sequence.',
+    KdsAlertTone.pulse => 'A short two-pulse service cue.',
+    KdsAlertTone.call => 'A friendly two-note kitchen call.',
+    KdsAlertTone.alert =>
+      'The Bright chime motif, faster and repeated for urgent orders.',
+    KdsAlertTone.priority =>
+      'The Warm bell motif, faster and repeated for urgent orders.',
+    KdsAlertTone.urgentPulse =>
+      'The Quick pulse motif, faster and repeated for urgent orders.',
+    KdsAlertTone.urgentCall =>
+      'The Kitchen call motif, faster and repeated for urgent orders.',
   };
 }
 

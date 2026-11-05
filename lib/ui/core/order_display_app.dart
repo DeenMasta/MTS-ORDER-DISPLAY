@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'app_splash.dart';
 import '../features/kitchen/view_models/kitchen_board_view_model.dart';
 import '../features/pairing/view_models/pairing_view_model.dart';
 import '../features/session/view_models/session_view_model.dart';
@@ -26,10 +27,12 @@ class OrderDisplayApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF8A2A19)),
         useMaterial3: true,
       ),
-      home: SessionGate(
-        sessionViewModel: sessionViewModel,
-        pairingViewModel: pairingViewModel,
-        kitchenBoardViewModel: kitchenBoardViewModel,
+      home: AppSplash(
+        child: SessionGate(
+          sessionViewModel: sessionViewModel,
+          pairingViewModel: pairingViewModel,
+          kitchenBoardViewModel: kitchenBoardViewModel,
+        ),
       ),
     );
   }

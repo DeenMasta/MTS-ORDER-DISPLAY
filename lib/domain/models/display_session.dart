@@ -28,7 +28,7 @@ class DisplaySession {
     final displayName =
         storedDisplayName is String && storedDisplayName.trim().isNotEmpty
         ? storedDisplayName.trim()
-        : 'Kitchen Display';
+        : 'Order Display';
     return DisplaySession(
       displayId: value('display_id'),
       posIp: posIp.trim(),

@@ -309,9 +309,10 @@ class _KitchenSideMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
     final width = math.min(
-      360.0,
-      math.max(280.0, MediaQuery.sizeOf(context).width * .78),
+      math.max(160.0, screenWidth - 16),
+      math.min(360.0, math.max(280.0, screenWidth * .78)),
     );
     return Drawer(
       width: width,
@@ -375,7 +376,7 @@ class _KitchenSideMenu extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.all(22),
               child: Text(
-                'Kitchen Display System',
+                'Order Display System',
                 style: TextStyle(color: _appChromeMuted, fontSize: 12),
               ),
             ),
@@ -766,12 +767,21 @@ class _TicketCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (ticket.tableName case final table?)
-                        Text(
-                          'Table $table',
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
+                      if (ticket.tableName case final table?
+                          when table.isNotEmpty)
+                        Flexible(
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 8),
+                            child: Text(
+                              'Table $table',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.end,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                           ),
                         ),
                     ],
@@ -895,16 +905,26 @@ class _Pager extends StatelessWidget {
         onPressed: viewModel.page == 0 ? null : viewModel.showPreviousPage,
         icon: const Icon(Icons.chevron_left, color: Colors.white),
       ),
-      ...List.generate(
-        viewModel.pageCount,
-        (index) => Container(
-          width: 12,
-          height: 12,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: index == viewModel.page ? Colors.white : Colors.transparent,
-            border: Border.all(color: Colors.white),
+      Expanded(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(
+              viewModel.pageCount,
+              (index) => Container(
+                width: 12,
+                height: 12,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: index == viewModel.page
+                      ? Colors.white
+                      : Colors.transparent,
+                  border: Border.all(color: Colors.white),
+                ),
+              ),
+            ),
           ),
         ),
       ),

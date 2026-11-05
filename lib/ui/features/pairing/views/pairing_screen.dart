@@ -17,7 +17,7 @@ class PairingScreen extends StatefulWidget {
 }
 
 class _PairingScreenState extends State<PairingScreen> {
-  final _displayNameController = TextEditingController(text: 'Kitchen Display');
+  final _displayNameController = TextEditingController(text: 'Order Display');
   final _posAddressController = TextEditingController();
   final _displayNameFocusNode = FocusNode();
 
@@ -147,7 +147,7 @@ class _PairingCard extends StatelessWidget {
         Center(child: Image.asset('assets/images/mysztech_logo.png', height: 42)),
         const SizedBox(height: 24),
         Text(
-          waiting ? 'Confirm pairing' : 'Set up your kitchen display',
+          waiting ? 'Confirm pairing' : 'Set up your order display',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.w700,
