@@ -78,7 +78,7 @@ class _MysztechSplash extends StatelessWidget {
                   math.min(350.0, math.max(160.0, constraints.maxWidth * .54)),
                 );
                 return Semantics(
-                  label: 'Mysztech Kitchen Display is starting',
+                  label: 'Mysztech Order Display is starting',
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [

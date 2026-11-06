@@ -172,7 +172,7 @@ class _KitchenBoardBody extends StatelessWidget {
                     : viewModel.visibleTicketGroups.isEmpty
                     ? const Center(
                         child: Text(
-                          'No active kitchen tickets.',
+                          'No active order tickets.',
                           style: TextStyle(color: Colors.white70, fontSize: 18),
                         ),
                       )
