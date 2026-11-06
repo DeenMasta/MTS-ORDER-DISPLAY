@@ -28,10 +28,8 @@ class KitchenSettingsScreen extends StatefulWidget {
 
 class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
   late KdsSettings _draft;
-  late final TextEditingController _warningMinutesController;
-  late final TextEditingController _warningSecondsController;
-  late final TextEditingController _urgentMinutesController;
-  late final TextEditingController _urgentSecondsController;
+  late final TextEditingController _warningTimerController;
+  late final TextEditingController _urgentTimerController;
   List<KdsOrderType> _orderTypes = const [];
   bool _loadingOrderTypes = true;
   Timer? _timerSaveDebounce;
@@ -41,17 +39,11 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
   void initState() {
     super.initState();
     _draft = widget.viewModel.settings;
-    _warningMinutesController = TextEditingController(
-      text: _draft.warningMinutes.toString(),
+    _warningTimerController = TextEditingController(
+      text: _formatTimerInput(_draft.warningThresholdSeconds),
     );
-    _warningSecondsController = TextEditingController(
-      text: _draft.warningSeconds.toString(),
-    );
-    _urgentMinutesController = TextEditingController(
-      text: _draft.urgentMinutes.toString(),
-    );
-    _urgentSecondsController = TextEditingController(
-      text: _draft.urgentSeconds.toString(),
+    _urgentTimerController = TextEditingController(
+      text: _formatTimerInput(_draft.urgentThresholdSeconds),
     );
     _loadOrderTypes();
   }
@@ -59,10 +51,8 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
   @override
   void dispose() {
     _timerSaveDebounce?.cancel();
-    _warningMinutesController.dispose();
-    _warningSecondsController.dispose();
-    _urgentMinutesController.dispose();
-    _urgentSecondsController.dispose();
+    _warningTimerController.dispose();
+    _urgentTimerController.dispose();
     super.dispose();
   }
 
@@ -77,37 +67,29 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
   Future<void> _saveTimerThresholds({
     bool showValidationMessage = false,
   }) async {
-    final warningMinutes = int.tryParse(_warningMinutesController.text.trim());
-    final warningSeconds = int.tryParse(_warningSecondsController.text.trim());
-    final urgentMinutes = int.tryParse(_urgentMinutesController.text.trim());
-    final urgentSeconds = int.tryParse(_urgentSecondsController.text.trim());
-    final warningThresholdSeconds =
-        (warningMinutes ?? 0) * 60 + (warningSeconds ?? 0);
-    final urgentThresholdSeconds =
-        (urgentMinutes ?? 0) * 60 + (urgentSeconds ?? 0);
-    if (warningMinutes == null ||
-        warningSeconds == null ||
-        urgentMinutes == null ||
-        urgentSeconds == null ||
-        warningMinutes < 0 ||
-        urgentMinutes < 0 ||
-        warningSeconds < 0 ||
-        warningSeconds >= 60 ||
-        urgentSeconds < 0 ||
-        urgentSeconds >= 60 ||
+    final warningThresholdSeconds = _parseTimerInput(
+      _warningTimerController.text,
+    );
+    final urgentThresholdSeconds = _parseTimerInput(
+      _urgentTimerController.text,
+    );
+    if (warningThresholdSeconds == null ||
+        urgentThresholdSeconds == null ||
         warningThresholdSeconds <= 0 ||
         warningThresholdSeconds >= urgentThresholdSeconds) {
       if (showValidationMessage) {
-        _message('Yellow must be above 00:00 and before red.');
+        _message('Use MM:SS. Yellow must be above 00:00 and before red.');
       }
       return;
     }
+    _normaliseTimerInput(_warningTimerController, warningThresholdSeconds);
+    _normaliseTimerInput(_urgentTimerController, urgentThresholdSeconds);
     await _update(
       _draft.copyWith(
-        warningMinutes: warningMinutes,
-        warningSeconds: warningSeconds,
-        urgentMinutes: urgentMinutes,
-        urgentSeconds: urgentSeconds,
+        warningMinutes: warningThresholdSeconds ~/ 60,
+        warningSeconds: warningThresholdSeconds % 60,
+        urgentMinutes: urgentThresholdSeconds ~/ 60,
+        urgentSeconds: urgentThresholdSeconds % 60,
       ),
     );
   }
@@ -136,10 +118,12 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
     if (!mounted || !identical(_draft, failedValue)) return;
     final restored = widget.viewModel.settings;
     setState(() => _draft = restored);
-    _warningMinutesController.text = restored.warningMinutes.toString();
-    _warningSecondsController.text = restored.warningSeconds.toString();
-    _urgentMinutesController.text = restored.urgentMinutes.toString();
-    _urgentSecondsController.text = restored.urgentSeconds.toString();
+    _warningTimerController.text = _formatTimerInput(
+      restored.warningThresholdSeconds,
+    );
+    _urgentTimerController.text = _formatTimerInput(
+      restored.urgentThresholdSeconds,
+    );
   }
 
   Future<void> _loadOrderTypes() async {
@@ -533,14 +517,12 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                         children: [
                           _timerThresholdFields(
                             label: 'Yellow starts at',
-                            minutesController: _warningMinutesController,
-                            secondsController: _warningSecondsController,
+                            controller: _warningTimerController,
                           ),
                           const SizedBox(height: 12),
                           _timerThresholdFields(
                             label: 'Red starts at',
-                            minutesController: _urgentMinutesController,
-                            secondsController: _urgentSecondsController,
+                            controller: _urgentTimerController,
                           ),
                         ],
                       )
@@ -549,16 +531,14 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                           Expanded(
                             child: _timerThresholdFields(
                               label: 'Yellow starts at',
-                              minutesController: _warningMinutesController,
-                              secondsController: _warningSecondsController,
+                              controller: _warningTimerController,
                             ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: _timerThresholdFields(
                               label: 'Red starts at',
-                              minutesController: _urgentMinutesController,
-                              secondsController: _urgentSecondsController,
+                              controller: _urgentTimerController,
                             ),
                           ),
                         ],
@@ -566,7 +546,7 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
               ),
               const SizedBox(height: 12),
               const Text(
-                'Use minutes and seconds. Yellow must be above 00:00 and before red.',
+                'Type four digits (for example, 1000 becomes 10:00). Yellow must be above 00:00 and before red.',
               ),
               const SizedBox(height: 16),
               _TimerPreview(
@@ -710,38 +690,95 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
 
   Widget _timerThresholdFields({
     required String label,
-    required TextEditingController minutesController,
-    required TextEditingController secondsController,
+    required TextEditingController controller,
   }) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(label, style: Theme.of(context).textTheme.titleSmall),
       const SizedBox(height: 8),
-      Row(
-        children: [
-          Expanded(child: _timerField(minutesController, 'Minutes')),
-          const SizedBox(width: 8),
-          Expanded(child: _timerField(secondsController, 'Seconds')),
-        ],
-      ),
+      _timerField(controller),
     ],
   );
 
-  Widget _timerField(TextEditingController controller, String label) =>
-      TextField(
-        controller: controller,
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        onChanged: (_) => _scheduleTimerSave(),
-        onSubmitted: (_) =>
-            unawaited(_saveTimerThresholds(showValidationMessage: true)),
-        onTapOutside: (_) =>
-            unawaited(_saveTimerThresholds(showValidationMessage: true)),
-        decoration: InputDecoration(
-          border: const OutlineInputBorder(),
-          labelText: label,
-        ),
+  Widget _timerField(TextEditingController controller) => TextField(
+    controller: controller,
+    keyboardType: TextInputType.datetime,
+    inputFormatters: const [_TimerInputFormatter()],
+    onChanged: (_) => _scheduleTimerSave(),
+    onSubmitted: (_) =>
+        unawaited(_saveTimerThresholds(showValidationMessage: true)),
+    onTapOutside: (_) =>
+        unawaited(_saveTimerThresholds(showValidationMessage: true)),
+    decoration: InputDecoration(
+      border: const OutlineInputBorder(),
+      labelText: 'MM:SS',
+      hintText: '05:00',
+    ),
+  );
+
+  void _normaliseTimerInput(
+    TextEditingController controller,
+    int totalSeconds,
+  ) {
+    final formatted = _formatTimerInput(totalSeconds);
+    if (controller.text == formatted) return;
+    controller.value = TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+int? _parseTimerInput(String value) {
+  final match = RegExp(r'^(\d+):(\d{1,2})$').firstMatch(value.trim());
+  if (match == null) return null;
+  final minutes = int.tryParse(match.group(1)!);
+  final seconds = int.tryParse(match.group(2)!);
+  if (minutes == null || seconds == null || minutes < 0 || seconds >= 60) {
+    return null;
+  }
+  return minutes * 60 + seconds;
+}
+
+String _formatTimerInput(int totalSeconds) {
+  final minutes = totalSeconds ~/ 60;
+  final seconds = totalSeconds % 60;
+  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+}
+
+class _TimerInputFormatter extends TextInputFormatter {
+  const _TimerInputFormatter();
+
+  static final _digitsOnly = RegExp(r'^\d*$');
+  static final _partialTimer = RegExp(r'^\d{0,2}:\d{0,2}$');
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    if (text.isEmpty) return newValue;
+
+    if (_digitsOnly.hasMatch(text)) {
+      if (text.length > 4) return oldValue;
+      if (text.length == 1) return newValue;
+      final formatted = '${text.substring(0, 2)}:${text.substring(2)}';
+      final seconds = text.length > 2 ? int.tryParse(text.substring(2)) : null;
+      if (seconds != null && seconds >= 60) return oldValue;
+      return newValue.copyWith(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: newValue.selection.end + 1),
       );
+    }
+
+    if (!_partialTimer.hasMatch(text)) return oldValue;
+
+    final segments = text.split(':');
+    final seconds = segments.length == 2 ? int.tryParse(segments.last) : null;
+    if (seconds != null && seconds >= 60) return oldValue;
+    return newValue;
+  }
 }
 
 class _Section extends StatelessWidget {

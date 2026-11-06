@@ -71,16 +71,20 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField).first, '7');
+    expect(find.byType(TextField), findsNWidgets(2));
+    await tester.enterText(find.byType(TextField).first, '07:00');
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
 
     expect(settingsRepository.savedSettings, hasLength(1));
     expect(settingsRepository.savedSettings.single.warningMinutes, 7);
+    expect(settingsRepository.savedSettings.single.warningSeconds, isZero);
     expect(settingsRepository.savedSettings.single.urgentMinutes, 10);
   });
 
-  testWidgets('saves timer seconds after typing stops', (tester) async {
+  testWidgets('saves a combined timer and formats seconds with two digits', (
+    tester,
+  ) async {
     final settingsRepository = _RecordingSettingsRepository();
     final viewModel = KitchenBoardViewModel(
       repository: _EmptyKitchenRepository(),
@@ -99,15 +103,67 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byType(TextField).at(1), '30');
+    await tester.enterText(find.byType(TextField).first, '5:3');
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
 
     expect(settingsRepository.savedSettings, hasLength(1));
     expect(settingsRepository.savedSettings.single.warningMinutes, 5);
-    expect(settingsRepository.savedSettings.single.warningSeconds, 30);
+    expect(settingsRepository.savedSettings.single.warningSeconds, 3);
     expect(settingsRepository.savedSettings.single.urgentMinutes, 10);
     expect(settingsRepository.savedSettings.single.urgentSeconds, isZero);
+    expect(
+      tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+      '05:03',
+    );
+  });
+
+  testWidgets('limits timer entry to a two-digit MM:SS value', (tester) async {
+    final viewModel = KitchenBoardViewModel(
+      repository: _EmptyKitchenRepository(),
+      settingsRepository: _RecordingSettingsRepository(),
+    );
+    addTearDown(viewModel.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: KitchenSettingsScreen(
+          viewModel: viewModel,
+          session: _session,
+          onChangeConnection: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final timerField = find.byType(TextField).first;
+    await tester.enterText(timerField, '123:456');
+
+    expect(tester.widget<TextField>(timerField).controller!.text, '05:00');
+  });
+
+  testWidgets('inserts the separator after two minute digits', (tester) async {
+    final viewModel = KitchenBoardViewModel(
+      repository: _EmptyKitchenRepository(),
+      settingsRepository: _RecordingSettingsRepository(),
+    );
+    addTearDown(viewModel.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: KitchenSettingsScreen(
+          viewModel: viewModel,
+          session: _session,
+          onChangeConnection: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final timerField = find.byType(TextField).first;
+    await tester.enterText(timerField, '1000');
+
+    expect(tester.widget<TextField>(timerField).controller!.text, '10:00');
   });
 }
 
