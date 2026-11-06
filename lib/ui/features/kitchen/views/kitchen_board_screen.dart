@@ -903,15 +903,14 @@ class _Pager extends StatelessWidget {
             children: List.generate(
               viewModel.pageCount,
               (index) => Container(
-                width: 12,
-                height: 12,
+                width: 20,
+                height: 4,
                 margin: const EdgeInsets.symmetric(horizontal: 4),
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(99),
                   color: index == viewModel.page
                       ? _boardForeground
-                      : Colors.transparent,
-                  border: Border.all(color: _boardForeground),
+                      : const Color(0xFFD5DAD8),
                 ),
               ),
             ),
