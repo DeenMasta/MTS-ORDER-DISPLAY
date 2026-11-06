@@ -4,6 +4,7 @@ import 'data/repositories/display_session_repository.dart';
 import 'data/repositories/kitchen_repository.dart';
 import 'data/repositories/pairing_repository.dart';
 import 'data/services/app_database.dart';
+import 'data/services/app_version_service.dart';
 import 'data/services/display_settings_store.dart';
 import 'data/services/kitchen_alert_player.dart';
 import 'data/services/pos_connection_service.dart';
@@ -12,6 +13,7 @@ import 'data/services/ticket_store.dart';
 import 'ui/features/kitchen/view_models/kitchen_board_view_model.dart';
 import 'ui/features/pairing/view_models/pairing_view_model.dart';
 import 'ui/features/session/view_models/session_view_model.dart';
+import 'ui/core/app_version_view_model.dart';
 
 class AppDependencies {
   AppDependencies() {
@@ -22,6 +24,9 @@ class AppDependencies {
     final deviceIdentityRepository = SecureDeviceIdentityRepository();
     final pairingRepository = LanPairingRepository(connection: connection);
     sessionViewModel = SessionViewModel(sessionRepository: sessionRepository);
+    appVersionViewModel = AppVersionViewModel(
+      appVersionService: BundledPubspecAppVersionService(),
+    );
     pairingViewModel = PairingViewModel(
       pairingRepository: pairingRepository,
       deviceIdentityRepository: deviceIdentityRepository,
@@ -42,6 +47,7 @@ class AppDependencies {
   }
 
   late final KitchenBoardViewModel kitchenBoardViewModel;
+  late final AppVersionViewModel appVersionViewModel;
   late final PairingViewModel pairingViewModel;
   late final SessionViewModel sessionViewModel;
 }

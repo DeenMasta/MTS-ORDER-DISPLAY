@@ -7,11 +7,13 @@ import 'package:mysztech_order_display/data/repositories/display_settings_reposi
 import 'package:mysztech_order_display/data/repositories/display_session_repository.dart';
 import 'package:mysztech_order_display/data/repositories/kitchen_repository.dart';
 import 'package:mysztech_order_display/data/repositories/pairing_repository.dart';
+import 'package:mysztech_order_display/data/services/app_version_service.dart';
 import 'package:mysztech_order_display/domain/models/display_session.dart';
 import 'package:mysztech_order_display/domain/models/kds_settings.dart';
 import 'package:mysztech_order_display/domain/models/kitchen_ticket.dart';
 import 'package:mysztech_order_display/domain/models/pairing.dart';
 import 'package:mysztech_order_display/ui/core/app_splash.dart';
+import 'package:mysztech_order_display/ui/core/app_version_view_model.dart';
 import 'package:mysztech_order_display/ui/core/order_display_app.dart';
 import 'package:mysztech_order_display/ui/features/kitchen/view_models/kitchen_board_view_model.dart';
 import 'package:mysztech_order_display/ui/features/pairing/view_models/pairing_view_model.dart';
@@ -31,6 +33,17 @@ void main() {
       ),
     );
 
+    expect(find.text('MYSZTECH'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Image &&
+            widget.image is AssetImage &&
+            (widget.image as AssetImage).assetName ==
+                'assets/images/kds_order_display_icon_rose.png',
+      ),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -50,6 +63,9 @@ void main() {
         kitchenBoardViewModel: KitchenBoardViewModel(
           repository: EmptyKitchenRepository(),
           settingsRepository: EmptySettingsRepository(),
+        ),
+        appVersionViewModel: AppVersionViewModel(
+          appVersionService: FixedAppVersionService(),
         ),
       ),
     );
@@ -138,6 +154,11 @@ class EmptyPairingRepository implements PairingRepository {
 class FixedDeviceIdentityRepository implements DeviceIdentityRepository {
   @override
   Future<String> getOrCreate() async => 'installation-1';
+}
+
+class FixedAppVersionService implements AppVersionService {
+  @override
+  Future<String> get displayVersion async => 'v1.0.0+1';
 }
 
 class EmptyDisplaySessionRepository implements DisplaySessionRepository {

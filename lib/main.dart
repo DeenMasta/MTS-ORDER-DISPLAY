@@ -11,7 +11,9 @@ void main() {
       sessionViewModel: dependencies.sessionViewModel,
       pairingViewModel: dependencies.pairingViewModel,
       kitchenBoardViewModel: dependencies.kitchenBoardViewModel,
+      appVersionViewModel: dependencies.appVersionViewModel,
     ),
   );
   dependencies.sessionViewModel.initialize();
+  dependencies.appVersionViewModel.load();
 }

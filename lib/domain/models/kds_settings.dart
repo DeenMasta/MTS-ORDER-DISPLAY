@@ -66,7 +66,9 @@ extension KdsAlertToneLabel on KdsAlertTone {
 class KdsSettings {
   const KdsSettings({
     this.warningMinutes = 5,
+    this.warningSeconds = 0,
     this.urgentMinutes = 10,
+    this.urgentSeconds = 0,
     this.largeText = false,
     this.compactCards = false,
     this.newestFirst = false,
@@ -78,7 +80,9 @@ class KdsSettings {
   });
 
   final int warningMinutes;
+  final int warningSeconds;
   final int urgentMinutes;
+  final int urgentSeconds;
   final bool largeText;
   final bool compactCards;
   final bool newestFirst;
@@ -87,6 +91,12 @@ class KdsSettings {
   final KdsAlertTone newOrderTone;
   final KdsAlertTone urgentOrderTone;
   final Map<String, bool> orderTypeVisibility;
+
+  /// Total elapsed seconds before the yellow timer state begins.
+  int get warningThresholdSeconds => warningMinutes * 60 + warningSeconds;
+
+  /// Total elapsed seconds before the red timer state begins.
+  int get urgentThresholdSeconds => urgentMinutes * 60 + urgentSeconds;
 
   /// Order types are visible by default so newly received POS types appear
   /// without requiring any local configuration.
@@ -117,7 +127,9 @@ class KdsSettings {
 
   KdsSettings copyWith({
     int? warningMinutes,
+    int? warningSeconds,
     int? urgentMinutes,
+    int? urgentSeconds,
     bool? largeText,
     bool? compactCards,
     bool? newestFirst,
@@ -128,7 +140,9 @@ class KdsSettings {
     Map<String, bool>? orderTypeVisibility,
   }) => KdsSettings(
     warningMinutes: warningMinutes ?? this.warningMinutes,
+    warningSeconds: warningSeconds ?? this.warningSeconds,
     urgentMinutes: urgentMinutes ?? this.urgentMinutes,
+    urgentSeconds: urgentSeconds ?? this.urgentSeconds,
     largeText: largeText ?? this.largeText,
     compactCards: compactCards ?? this.compactCards,
     newestFirst: newestFirst ?? this.newestFirst,
@@ -141,7 +155,9 @@ class KdsSettings {
 
   Map<String, Object> toJson() => {
     'warning_minutes': warningMinutes,
+    'warning_seconds': warningSeconds,
     'urgent_minutes': urgentMinutes,
+    'urgent_seconds': urgentSeconds,
     'large_text': largeText,
     'compact_cards': compactCards,
     'newest_first': newestFirst,
@@ -154,7 +170,9 @@ class KdsSettings {
 
   factory KdsSettings.fromJson(Map<String, dynamic> json) => KdsSettings(
     warningMinutes: json['warning_minutes'] as int? ?? 5,
+    warningSeconds: json['warning_seconds'] as int? ?? 0,
     urgentMinutes: json['urgent_minutes'] as int? ?? 10,
+    urgentSeconds: json['urgent_seconds'] as int? ?? 0,
     largeText: json['large_text'] as bool? ?? false,
     compactCards: json['compact_cards'] as bool? ?? false,
     newestFirst: json['newest_first'] as bool? ?? false,

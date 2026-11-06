@@ -2,9 +2,10 @@
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
-        android:label="Mysztech Order Display"
+        android:label="Mysztech ODS"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/kds_order_display_icon_rose"
+        android:roundIcon="@drawable/kds_order_display_icon_rose"
         android:usesCleartextTraffic="true">
         
         <activity

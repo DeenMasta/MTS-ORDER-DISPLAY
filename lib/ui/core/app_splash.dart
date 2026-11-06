@@ -3,6 +3,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'app_colors.dart';
+
 /// Brief branded launch state shown while the display restores its session.
 class AppSplash extends StatefulWidget {
   const AppSplash({super.key, required this.child, this.minimumDuration});
@@ -55,10 +57,10 @@ class _MysztechSplash extends StatelessWidget {
   Widget build(BuildContext context) => Scaffold(
     body: Container(
       decoration: const BoxDecoration(
-        color: Color(0xFFF7F5F0),
-        image: DecorationImage(
-          image: AssetImage('assets/images/kds_background.png'),
-          fit: BoxFit.cover,
+        gradient: RadialGradient(
+          center: Alignment(0, -.35),
+          radius: 1.15,
+          colors: [AppColors.surface, AppColors.primarySoft],
         ),
       ),
       child: DecoratedBox(
@@ -67,38 +69,48 @@ class _MysztechSplash extends StatelessWidget {
           child: Center(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final logoWidth = math.min(
-                  constraints.maxWidth,
-                  math.min(350.0, math.max(160.0, constraints.maxWidth * .54)),
-                );
+                final iconSize = math.min(176.0, constraints.maxWidth * .56);
                 return Semantics(
-                  label: 'Mysztech Order Display is starting',
+                  label: 'Mysztech ODS is starting',
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Image.asset(
-                        'assets/images/mysztech_logo.png',
-                        width: logoWidth,
+                        'assets/images/kds_order_display_icon_rose.png',
+                        width: iconSize,
                         filterQuality: FilterQuality.high,
                       ),
-                      const SizedBox(height: 26),
+                      const SizedBox(height: 24),
                       FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          'KITCHEN DISPLAY',
+                          'MYSZTECH',
                           style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(
-                                color: const Color(0xFF17212B),
+                                color: AppColors.primaryDark,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: 3.4,
                               ),
                         ),
                       ),
                       const SizedBox(height: 10),
+                      const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          'ODS · ORDER DISPLAY',
+                          style: TextStyle(
+                            color: AppColors.primaryMuted,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2.4,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
                       const Text(
                         'Preparing your kitchen workspace',
                         style: TextStyle(
-                          color: Color(0xFF52616B),
+                          color: AppColors.mutedText,
                           fontSize: 13,
                         ),
                       ),
@@ -109,8 +121,8 @@ class _MysztechSplash extends StatelessWidget {
                           borderRadius: BorderRadius.all(Radius.circular(99)),
                           child: LinearProgressIndicator(
                             minHeight: 4,
-                            color: Color(0xFFA44C2E),
-                            backgroundColor: Color(0x33A44C2E),
+                            color: AppColors.primary,
+                            backgroundColor: Color(0x33C00050),
                           ),
                         ),
                       ),

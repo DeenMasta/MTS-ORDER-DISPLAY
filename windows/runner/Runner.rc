@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.mysztechnology" "\0"
-            VALUE "FileDescription", "Mysztech Order Display" "\0"
+            VALUE "FileDescription", "Mysztech ODS" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "mysztech_order_display" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.mysztechnology. All rights reserved." "\0"
             VALUE "OriginalFilename", "mysztech_order_display.exe" "\0"
-            VALUE "ProductName", "Mysztech Order Display" "\0"
+            VALUE "ProductName", "Mysztech ODS" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

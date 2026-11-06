@@ -5,15 +5,16 @@ import 'package:flutter/material.dart';
 import '../../../../domain/models/display_session.dart';
 import '../../../../domain/models/kds_settings.dart';
 import '../../../../domain/models/kitchen_ticket.dart';
+import '../../../core/app_colors.dart';
 import '../../../core/order_type_icon_library.dart';
 import '../view_models/kitchen_board_view_model.dart';
 import 'kitchen_history_screen.dart';
 import 'kitchen_settings_screen.dart';
 import 'slanted_timer_clipper.dart';
 
-const _boardBackground = Color(0xFFF7F5F0);
-const _boardForeground = Color(0xFF17212B);
-const _boardMuted = Color(0xFF52616B);
+const _boardBackground = AppColors.canvas;
+const _boardForeground = AppColors.text;
+const _boardMuted = AppColors.mutedText;
 
 class KitchenBoardScreen extends StatefulWidget {
   const KitchenBoardScreen({
@@ -21,10 +22,14 @@ class KitchenBoardScreen extends StatefulWidget {
     required this.viewModel,
     required this.session,
     required this.onChangeConnection,
+    required this.appName,
+    required this.appVersion,
   });
   final KitchenBoardViewModel viewModel;
   final DisplaySession session;
   final Future<void> Function() onChangeConnection;
+  final String appName;
+  final String? appVersion;
 
   @override
   State<KitchenBoardScreen> createState() => _KitchenBoardScreenState();
@@ -72,6 +77,8 @@ class _KitchenBoardScreenState extends State<KitchenBoardScreen> {
     endDrawer: _KitchenSideMenu(
       onHistory: _openHistory,
       onSettings: _openSettings,
+      appName: widget.appName,
+      appVersion: widget.appVersion,
     ),
     body: Stack(
       children: [
@@ -96,8 +103,13 @@ class _BrandPatternBackground extends StatelessWidget {
   const _BrandPatternBackground();
 
   @override
-  Widget build(BuildContext context) =>
-      Image.asset('assets/images/kds_background.png', fit: BoxFit.cover);
+  Widget build(BuildContext context) => Stack(
+    fit: StackFit.expand,
+    children: [
+      Image.asset('assets/images/kds_background.png', fit: BoxFit.cover),
+      const ColoredBox(color: Color(0x55FFE0F0)),
+    ],
+  );
 }
 
 class _KitchenBoardBody extends StatelessWidget {
@@ -165,13 +177,8 @@ class _KitchenBoardBody extends StatelessWidget {
                     : viewModel.visibleTicketGroups.isEmpty
                     ? const Center(
                         child: Text(
-<<<<<<< HEAD
                           'No active order tickets.',
-                          style: TextStyle(color: Colors.white70, fontSize: 18),
-=======
-                          'No active kitchen tickets.',
                           style: TextStyle(color: _boardMuted, fontSize: 18),
->>>>>>> c50a038641acfb1d97d97265ed77c135570a93c3
                         ),
                       )
                     : _TicketPager(
@@ -209,9 +216,9 @@ class _ConnectionStatus extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
     decoration: BoxDecoration(
-      color: const Color(0xFFFFFCF9),
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: const Color(0xFFD5DAD8)),
+      border: Border.all(color: AppColors.outline),
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
@@ -256,7 +263,7 @@ class _Header extends StatelessWidget {
     decoration: BoxDecoration(
       color: _boardBackground,
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: const Color(0xFFD5DAD8)),
+      border: Border.all(color: AppColors.outline),
       boxShadow: const [
         BoxShadow(
           color: Color(0x33000000),
@@ -296,10 +303,17 @@ class _Header extends StatelessWidget {
 }
 
 class _KitchenSideMenu extends StatelessWidget {
-  const _KitchenSideMenu({required this.onHistory, required this.onSettings});
+  const _KitchenSideMenu({
+    required this.onHistory,
+    required this.onSettings,
+    required this.appName,
+    required this.appVersion,
+  });
 
   final VoidCallback onHistory;
   final VoidCallback onSettings;
+  final String appName;
+  final String? appVersion;
 
   @override
   Widget build(BuildContext context) {
@@ -319,7 +333,7 @@ class _KitchenSideMenu extends StatelessWidget {
             Container(
               padding: const EdgeInsets.fromLTRB(22, 22, 16, 20),
               decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFFD5DAD8))),
+                border: Border(bottom: BorderSide(color: AppColors.outline)),
               ),
               child: Row(
                 children: [
@@ -356,7 +370,7 @@ class _KitchenSideMenu extends StatelessWidget {
             ),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Divider(color: Color(0xFFD5DAD8), height: 1),
+              child: Divider(color: AppColors.outline, height: 1),
             ),
             _SideMenuItem(
               icon: Icons.settings_outlined,
@@ -365,11 +379,26 @@ class _KitchenSideMenu extends StatelessWidget {
               onTap: onSettings,
             ),
             const Spacer(),
-            const Padding(
-              padding: EdgeInsets.all(22),
-              child: Text(
-                'Order Display System',
-                style: TextStyle(color: _boardMuted, fontSize: 12),
+            Padding(
+              padding: const EdgeInsets.all(22),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      appName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: _boardMuted, fontSize: 12),
+                    ),
+                  ),
+                  if (appVersion case final version?) ...[
+                    const SizedBox(width: 12),
+                    Text(
+                      version,
+                      style: const TextStyle(color: _boardMuted, fontSize: 12),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
@@ -399,7 +428,7 @@ class _SideMenuItem extends StatelessWidget {
       width: 40,
       height: 40,
       decoration: BoxDecoration(
-        color: const Color(0xFFE5EBE7),
+        color: AppColors.primarySoft,
         borderRadius: BorderRadius.circular(11),
       ),
       child: Icon(icon, color: _boardForeground),
@@ -431,6 +460,7 @@ class _FilterBar extends StatelessWidget {
               child: ChoiceChip(
                 label: Text(filter.label.toUpperCase()),
                 selected: viewModel.filter == filter,
+                showCheckmark: false,
                 onSelected: (_) => viewModel.selectFilter(filter),
                 labelStyle: TextStyle(
                   fontSize: 11,
@@ -440,7 +470,7 @@ class _FilterBar extends StatelessWidget {
                       : Colors.black,
                 ),
                 selectedColor: Colors.black,
-                backgroundColor: Colors.white,
+                backgroundColor: AppColors.surfaceRaised,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 13,
                   vertical: 6,
@@ -635,15 +665,15 @@ class _TicketCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ticket = tickets.first;
     final elapsed = DateTime.now().difference(ticket.createdAt.toLocal());
-    final accent = elapsed.inMinutes >= settings.urgentMinutes
+    final accent = elapsed.inSeconds >= settings.urgentThresholdSeconds
         ? const Color(0xFFFF1C2C)
-        : elapsed.inMinutes >= settings.warningMinutes
+        : elapsed.inSeconds >= settings.warningThresholdSeconds
         ? const Color(0xFFFFEF00)
         : const Color(0xFF02D53C);
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
-      color: const Color(0xFFFAFAFA),
+      color: AppColors.surface,
       child: Column(
         children: [
           SizedBox(
@@ -804,7 +834,10 @@ class _TicketCard extends StatelessWidget {
             child: Center(
               child: Text(
                 _formatDate(ticket.enteredAt ?? ticket.createdAt),
-                style: const TextStyle(color: Color(0xFF52525B), fontSize: 11),
+                style: const TextStyle(
+                  color: AppColors.mutedText,
+                  fontSize: 11,
+                ),
               ),
             ),
           ),
@@ -814,7 +847,7 @@ class _TicketCard extends StatelessWidget {
   }
 }
 
-const _detailStyle = TextStyle(color: Color(0xFF45454D), fontSize: 12);
+const _detailStyle = TextStyle(color: AppColors.mutedText, fontSize: 12);
 
 class _Items extends StatelessWidget {
   const _Items({
@@ -915,7 +948,7 @@ class _Pager extends StatelessWidget {
                   borderRadius: BorderRadius.circular(99),
                   color: index == viewModel.page
                       ? _boardForeground
-                      : const Color(0xFFD5DAD8),
+                      : AppColors.outline,
                 ),
               ),
             ),

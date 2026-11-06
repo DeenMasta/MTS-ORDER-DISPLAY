@@ -208,6 +208,27 @@ void main() {
     );
   });
 
+  test('accepts timer thresholds that include seconds', () async {
+    final settingsRepository = _FakeSettingsRepository();
+    final viewModel = KitchenBoardViewModel(
+      repository: _FakeKitchenRepository([]),
+      settingsRepository: settingsRepository,
+    );
+    addTearDown(viewModel.dispose);
+
+    await viewModel.saveSettings(
+      const KdsSettings(
+        warningMinutes: 0,
+        warningSeconds: 30,
+        urgentMinutes: 1,
+        urgentSeconds: 15,
+      ),
+    );
+
+    expect(settingsRepository.value.warningThresholdSeconds, 30);
+    expect(settingsRepository.value.urgentThresholdSeconds, 75);
+  });
+
   test(
     'plays the selected new-order template once for a received order',
     () async {

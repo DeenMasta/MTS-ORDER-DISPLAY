@@ -35,7 +35,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   const int width = available_width < 1280 ? available_width : 1280;
   const int height = available_height < 720 ? available_height : 720;
   Win32Window::Size size(width, height);
-  if (!window.Create(L"Mysztech Order Display", origin, size)) {
+  if (!window.Create(L"Mysztech ODS", origin, size)) {
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);

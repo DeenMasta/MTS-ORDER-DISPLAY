@@ -47,4 +47,24 @@ void main() {
     expect(restored.isOrderTypeVisible(id: 'grab', name: 'Grab'), isFalse);
     expect(restored.isOrderTypeVisible(id: 'dine-in', name: 'Dine In'), isTrue);
   });
+
+  test('persists timer seconds and defaults them for existing settings', () {
+    const settings = KdsSettings(
+      warningMinutes: 2,
+      warningSeconds: 30,
+      urgentMinutes: 4,
+      urgentSeconds: 15,
+    );
+
+    final restored = KdsSettings.fromJson(settings.toJson());
+    final existingSettings = KdsSettings.fromJson({
+      'warning_minutes': 5,
+      'urgent_minutes': 10,
+    });
+
+    expect(restored.warningThresholdSeconds, 150);
+    expect(restored.urgentThresholdSeconds, 255);
+    expect(existingSettings.warningSeconds, isZero);
+    expect(existingSettings.urgentSeconds, isZero);
+  });
 }

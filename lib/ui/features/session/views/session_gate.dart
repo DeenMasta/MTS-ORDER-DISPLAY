@@ -12,11 +12,15 @@ class SessionGate extends StatelessWidget {
     required this.sessionViewModel,
     required this.pairingViewModel,
     required this.kitchenBoardViewModel,
+    required this.appName,
+    required this.appVersion,
   });
 
   final PairingViewModel pairingViewModel;
   final KitchenBoardViewModel kitchenBoardViewModel;
   final SessionViewModel sessionViewModel;
+  final String appName;
+  final String? appVersion;
 
   @override
   Widget build(BuildContext context) {
@@ -35,6 +39,8 @@ class SessionGate extends StatelessWidget {
           viewModel: kitchenBoardViewModel,
           session: sessionViewModel.session!,
           onChangeConnection: sessionViewModel.changeConnection,
+          appName: appName,
+          appVersion: appVersion,
         ),
         SessionStatus.error => _StatusScreen(
           title: 'Unable to start order display',

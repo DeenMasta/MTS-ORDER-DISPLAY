@@ -241,10 +241,16 @@ class KitchenBoardViewModel extends ChangeNotifier {
   }
 
   Future<void> saveSettings(KdsSettings settings) async {
-    if (settings.warningMinutes <= 0 ||
-        settings.warningMinutes >= settings.urgentMinutes) {
+    final hasInvalidSeconds =
+        settings.warningSeconds < 0 ||
+        settings.warningSeconds >= 60 ||
+        settings.urgentSeconds < 0 ||
+        settings.urgentSeconds >= 60;
+    if (hasInvalidSeconds ||
+        settings.warningThresholdSeconds <= 0 ||
+        settings.warningThresholdSeconds >= settings.urgentThresholdSeconds) {
       throw const FormatException(
-        'Yellow threshold must be greater than 0 and lower than red threshold.',
+        'Yellow timer must be above 00:00 and before the red timer.',
       );
     }
     await _settingsRepository.save(settings);
@@ -440,8 +446,8 @@ class KitchenBoardViewModel extends ChangeNotifier {
         .where(
           (ticket) =>
               !_isFinishedLocally(ticket) &&
-              now.difference(ticket.createdAt.toLocal()).inMinutes >=
-                  _settings.urgentMinutes,
+              now.difference(ticket.createdAt.toLocal()).inSeconds >=
+                  _settings.urgentThresholdSeconds,
         )
         .map((ticket) => ticket.id)
         .toSet();

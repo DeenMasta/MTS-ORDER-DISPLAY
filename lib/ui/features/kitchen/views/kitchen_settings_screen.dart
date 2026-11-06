@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../domain/models/display_session.dart';
 import '../../../../domain/models/kds_settings.dart';
 import '../../../../domain/models/kitchen_ticket.dart';
+import '../../../core/app_colors.dart';
 import '../../../core/order_type_icon_library.dart';
 import '../view_models/kitchen_board_view_model.dart';
 
@@ -25,56 +28,119 @@ class KitchenSettingsScreen extends StatefulWidget {
 
 class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
   late KdsSettings _draft;
-  late final TextEditingController _warningController;
-  late final TextEditingController _urgentController;
+  late final TextEditingController _warningMinutesController;
+  late final TextEditingController _warningSecondsController;
+  late final TextEditingController _urgentMinutesController;
+  late final TextEditingController _urgentSecondsController;
   List<KdsOrderType> _orderTypes = const [];
   bool _loadingOrderTypes = true;
+  Timer? _timerSaveDebounce;
+  Future<void> _saveQueue = Future<void>.value();
 
   @override
   void initState() {
     super.initState();
     _draft = widget.viewModel.settings;
-    _warningController = TextEditingController(
+    _warningMinutesController = TextEditingController(
       text: _draft.warningMinutes.toString(),
     );
-    _urgentController = TextEditingController(
+    _warningSecondsController = TextEditingController(
+      text: _draft.warningSeconds.toString(),
+    );
+    _urgentMinutesController = TextEditingController(
       text: _draft.urgentMinutes.toString(),
+    );
+    _urgentSecondsController = TextEditingController(
+      text: _draft.urgentSeconds.toString(),
     );
     _loadOrderTypes();
   }
 
   @override
   void dispose() {
-    _warningController.dispose();
-    _urgentController.dispose();
+    _timerSaveDebounce?.cancel();
+    _warningMinutesController.dispose();
+    _warningSecondsController.dispose();
+    _urgentMinutesController.dispose();
+    _urgentSecondsController.dispose();
     super.dispose();
   }
 
-  Future<void> _save() async {
-    final warning = int.tryParse(_warningController.text.trim());
-    final urgent = int.tryParse(_urgentController.text.trim());
-    if (warning == null || urgent == null) {
-      _message('Enter whole minutes for both timer thresholds.');
+  void _scheduleTimerSave() {
+    _timerSaveDebounce?.cancel();
+    _timerSaveDebounce = Timer(
+      const Duration(milliseconds: 650),
+      () => unawaited(_saveTimerThresholds()),
+    );
+  }
+
+  Future<void> _saveTimerThresholds({
+    bool showValidationMessage = false,
+  }) async {
+    final warningMinutes = int.tryParse(_warningMinutesController.text.trim());
+    final warningSeconds = int.tryParse(_warningSecondsController.text.trim());
+    final urgentMinutes = int.tryParse(_urgentMinutesController.text.trim());
+    final urgentSeconds = int.tryParse(_urgentSecondsController.text.trim());
+    final warningThresholdSeconds =
+        (warningMinutes ?? 0) * 60 + (warningSeconds ?? 0);
+    final urgentThresholdSeconds =
+        (urgentMinutes ?? 0) * 60 + (urgentSeconds ?? 0);
+    if (warningMinutes == null ||
+        warningSeconds == null ||
+        urgentMinutes == null ||
+        urgentSeconds == null ||
+        warningMinutes < 0 ||
+        urgentMinutes < 0 ||
+        warningSeconds < 0 ||
+        warningSeconds >= 60 ||
+        urgentSeconds < 0 ||
+        urgentSeconds >= 60 ||
+        warningThresholdSeconds <= 0 ||
+        warningThresholdSeconds >= urgentThresholdSeconds) {
+      if (showValidationMessage) {
+        _message('Yellow must be above 00:00 and before red.');
+      }
       return;
     }
-    try {
-      await widget.viewModel.saveSettings(
-        _draft.copyWith(warningMinutes: warning, urgentMinutes: urgent),
-      );
-      if (mounted) {
-        _message('Settings saved.');
-        Navigator.pop(context);
-      }
-    } on FormatException catch (error) {
-      _message(error.message);
-    }
+    await _update(
+      _draft.copyWith(
+        warningMinutes: warningMinutes,
+        warningSeconds: warningSeconds,
+        urgentMinutes: urgentMinutes,
+        urgentSeconds: urgentSeconds,
+      ),
+    );
   }
 
   void _message(String message) => ScaffoldMessenger.of(
     context,
   ).showSnackBar(SnackBar(content: Text(message)));
 
-  void _update(KdsSettings value) => setState(() => _draft = value);
+  Future<void> _update(KdsSettings value) {
+    setState(() => _draft = value);
+    _saveQueue = _saveQueue.then((_) async {
+      try {
+        await widget.viewModel.saveSettings(value);
+      } on FormatException catch (error) {
+        _restoreUnsavedValue(value);
+        if (mounted) _message(error.message);
+      } on Object {
+        _restoreUnsavedValue(value);
+        if (mounted) _message('Unable to save settings on this display.');
+      }
+    });
+    return _saveQueue;
+  }
+
+  void _restoreUnsavedValue(KdsSettings failedValue) {
+    if (!mounted || !identical(_draft, failedValue)) return;
+    final restored = widget.viewModel.settings;
+    setState(() => _draft = restored);
+    _warningMinutesController.text = restored.warningMinutes.toString();
+    _warningSecondsController.text = restored.warningSeconds.toString();
+    _urgentMinutesController.text = restored.urgentMinutes.toString();
+    _urgentSecondsController.text = restored.urgentSeconds.toString();
+  }
 
   Future<void> _loadOrderTypes() async {
     final orderTypes = await widget.viewModel.orderTypes();
@@ -147,7 +213,7 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
   Future<String?> _showOrderTypeIconPicker(KdsOrderType type) =>
       showModalBottomSheet<String>(
         context: context,
-        backgroundColor: const Color(0xFFFFFCF9),
+        backgroundColor: AppColors.surface,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
@@ -161,14 +227,14 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                   Text(
                     'Choose an icon for ${type.name}',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: const Color(0xFF17212B),
+                      color: AppColors.text,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 4),
                   const Text(
                     'This icon is used on the receipt and dashboard.',
-                    style: TextStyle(color: Color(0xFF52616B)),
+                    style: TextStyle(color: AppColors.mutedText),
                   ),
                   const SizedBox(height: 20),
                   for (final category in const [
@@ -179,7 +245,7 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                     Text(
                       category,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: const Color(0xFF52616B),
+                        color: AppColors.mutedText,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -284,12 +350,11 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
       },
     );
     if (!mounted || selected == null) return;
-    _update(
+    await _update(
       urgent
           ? _draft.copyWith(urgentOrderTone: selected)
           : _draft.copyWith(newOrderTone: selected),
     );
-    _message('${selected.label} selected. Save changes to use it.');
   }
 
   Future<void> _testAlertSound({required bool urgent}) async {
@@ -316,60 +381,65 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
   @override
   Widget build(BuildContext context) => Theme(
     data: ThemeData(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFFA44C2E),
-      ).copyWith(
-        primary: const Color(0xFFA44C2E),
+      colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary).copyWith(
+        primary: AppColors.primary,
         onPrimary: Colors.white,
-        secondary: const Color(0xFF7A5A4A),
-        surface: const Color(0xFFFFFCF9),
-        onSurface: const Color(0xFF17212B),
-        outline: const Color(0xFFD5DAD8),
+        secondary: AppColors.primaryMuted,
+        surface: AppColors.surface,
+        onSurface: AppColors.text,
+        outline: AppColors.outline,
       ),
-      scaffoldBackgroundColor: const Color(0xFFF7F5F0),
+      scaffoldBackgroundColor: AppColors.canvas,
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFFF7F5F0),
-        foregroundColor: Color(0xFF17212B),
+        backgroundColor: AppColors.canvas,
+        foregroundColor: AppColors.text,
       ),
       cardTheme: CardThemeData(
-        color: const Color(0xFFFFFCF9),
+        color: AppColors.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: const BorderSide(color: Color(0xFFD5DAD8)),
+          side: const BorderSide(color: AppColors.outline),
         ),
       ),
       inputDecorationTheme: const InputDecorationTheme(
         filled: true,
-        fillColor: Color(0xFFFFFFFF),
-        labelStyle: TextStyle(color: Color(0xFF52616B)),
-        suffixStyle: TextStyle(color: Color(0xFF52616B)),
+        fillColor: AppColors.surfaceRaised,
+        labelStyle: TextStyle(color: AppColors.mutedText),
+        suffixStyle: TextStyle(color: AppColors.mutedText),
         enabledBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFFD5DAD8)),
+          borderSide: BorderSide(color: AppColors.outline),
         ),
         focusedBorder: OutlineInputBorder(
-          borderSide: BorderSide(color: Color(0xFFA44C2E), width: 1.5),
+          borderSide: BorderSide(color: AppColors.primary, width: 1.5),
         ),
       ),
       textTheme: ThemeData.light().textTheme.apply(
-        bodyColor: const Color(0xFF17212B),
-        displayColor: const Color(0xFF17212B),
+        bodyColor: AppColors.text,
+        displayColor: AppColors.text,
       ),
       listTileTheme: const ListTileThemeData(
-        iconColor: Color(0xFF52616B),
-        textColor: Color(0xFF17212B),
-        subtitleTextStyle: TextStyle(color: Color(0xFF52616B)),
+        iconColor: AppColors.mutedText,
+        textColor: AppColors.text,
+        subtitleTextStyle: TextStyle(color: AppColors.mutedText),
       ),
+      filledButtonTheme: const FilledButtonThemeData(
+        style: AppButtonStyles.filled,
+      ),
+      outlinedButtonTheme: const OutlinedButtonThemeData(
+        style: AppButtonStyles.outlined,
+      ),
+      textButtonTheme: const TextButtonThemeData(style: AppButtonStyles.text),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
               ? const Color(0xFFFFFFFF)
-              : const Color(0xFF9BAAB2),
+              : AppColors.disabled,
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
-              ? const Color(0xFFA44C2E)
-              : const Color(0xFFD5DAD8),
+              ? AppColors.primary
+              : AppColors.outline,
         ),
       ),
     ),
@@ -378,6 +448,13 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(4, 0, 4, 14),
+            child: Text(
+              'Changes save automatically to this display.',
+              style: TextStyle(color: AppColors.mutedText),
+            ),
+          ),
           _Section(
             title: 'Order types',
             children: [
@@ -404,8 +481,8 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                   ListTile(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                     leading: CircleAvatar(
-                      backgroundColor: const Color(0xFFF1E5DF),
-                      foregroundColor: const Color(0xFF17212B),
+                      backgroundColor: AppColors.primarySoft,
+                      foregroundColor: AppColors.text,
                       child: Icon(orderTypeIconFor(type.icon)),
                     ),
                     title: Text(
@@ -426,11 +503,13 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                             id: type.id,
                             name: type.name,
                           ),
-                          onChanged: (visible) => _update(
-                            _draft.withOrderTypeVisibility(
-                              id: type.id,
-                              name: type.name,
-                              visible: visible,
+                          onChanged: (visible) => unawaited(
+                            _update(
+                              _draft.withOrderTypeVisibility(
+                                id: type.id,
+                                name: type.name,
+                                visible: visible,
+                              ),
                             ),
                           ),
                         ),
@@ -449,36 +528,51 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
             title: 'Order timer',
             children: [
               LayoutBuilder(
-                builder: (context, constraints) => constraints.maxWidth < 360
+                builder: (context, constraints) => constraints.maxWidth < 520
                     ? Column(
                         children: [
-                          _minutesField(_warningController, 'Yellow starts at'),
+                          _timerThresholdFields(
+                            label: 'Yellow starts at',
+                            minutesController: _warningMinutesController,
+                            secondsController: _warningSecondsController,
+                          ),
                           const SizedBox(height: 12),
-                          _minutesField(_urgentController, 'Red starts at'),
+                          _timerThresholdFields(
+                            label: 'Red starts at',
+                            minutesController: _urgentMinutesController,
+                            secondsController: _urgentSecondsController,
+                          ),
                         ],
                       )
                     : Row(
                         children: [
                           Expanded(
-                            child: _minutesField(
-                              _warningController,
-                              'Yellow starts at',
+                            child: _timerThresholdFields(
+                              label: 'Yellow starts at',
+                              minutesController: _warningMinutesController,
+                              secondsController: _warningSecondsController,
                             ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: _minutesField(
-                              _urgentController,
-                              'Red starts at',
+                            child: _timerThresholdFields(
+                              label: 'Red starts at',
+                              minutesController: _urgentMinutesController,
+                              secondsController: _urgentSecondsController,
                             ),
                           ),
                         ],
                       ),
               ),
               const SizedBox(height: 12),
-              const Text('Yellow must be greater than 0 and lower than red.'),
+              const Text(
+                'Use minutes and seconds. Yellow must be above 00:00 and before red.',
+              ),
               const SizedBox(height: 16),
-              const _TimerPreview(),
+              _TimerPreview(
+                warningSeconds: _draft.warningThresholdSeconds,
+                urgentSeconds: _draft.urgentThresholdSeconds,
+              ),
             ],
           ),
           _Section(
@@ -491,7 +585,7 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                 ),
                 value: _draft.newOrderAlert,
                 onChanged: (value) =>
-                    _update(_draft.copyWith(newOrderAlert: value)),
+                    unawaited(_update(_draft.copyWith(newOrderAlert: value))),
               ),
               ListTile(
                 contentPadding: EdgeInsets.symmetric(horizontal: 16),
@@ -511,8 +605,9 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                   'Play once when an active order reaches the red timer.',
                 ),
                 value: _draft.urgentOrderAlert,
-                onChanged: (value) =>
-                    _update(_draft.copyWith(urgentOrderAlert: value)),
+                onChanged: (value) => unawaited(
+                  _update(_draft.copyWith(urgentOrderAlert: value)),
+                ),
               ),
               ListTile(
                 contentPadding: EdgeInsets.symmetric(horizontal: 16),
@@ -607,27 +702,44 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: _save,
-            icon: const Icon(Icons.save),
-            label: const Text('Save changes'),
-          ),
           const SizedBox(height: 24),
         ],
       ),
     ),
   );
 
-  Widget _minutesField(TextEditingController controller, String label) =>
+  Widget _timerThresholdFields({
+    required String label,
+    required TextEditingController minutesController,
+    required TextEditingController secondsController,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: Theme.of(context).textTheme.titleSmall),
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          Expanded(child: _timerField(minutesController, 'Minutes')),
+          const SizedBox(width: 8),
+          Expanded(child: _timerField(secondsController, 'Seconds')),
+        ],
+      ),
+    ],
+  );
+
+  Widget _timerField(TextEditingController controller, String label) =>
       TextField(
         controller: controller,
         keyboardType: TextInputType.number,
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        onChanged: (_) => _scheduleTimerSave(),
+        onSubmitted: (_) =>
+            unawaited(_saveTimerThresholds(showValidationMessage: true)),
+        onTapOutside: (_) =>
+            unawaited(_saveTimerThresholds(showValidationMessage: true)),
         decoration: InputDecoration(
           border: const OutlineInputBorder(),
           labelText: label,
-          suffixText: 'minutes',
         ),
       );
 }
@@ -669,7 +781,7 @@ class _OrderTypeIconChoice extends StatelessWidget {
     selected: selected,
     label: option.label,
     child: Material(
-      color: selected ? const Color(0xFFF1D8CE) : const Color(0xFFFFFFFF),
+      color: selected ? AppColors.primarySoft : AppColors.surfaceRaised,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
@@ -682,17 +794,14 @@ class _OrderTypeIconChoice extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  option.icon,
-                  color: const Color(0xFF17212B),
-                ),
+                Icon(option.icon, color: AppColors.text),
                 const SizedBox(height: 7),
                 Text(
                   option.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: const Color(0xFF17212B),
+                    color: AppColors.text,
                     fontSize: 11,
                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                   ),
@@ -707,29 +816,44 @@ class _OrderTypeIconChoice extends StatelessWidget {
 }
 
 class _TimerPreview extends StatelessWidget {
-  const _TimerPreview();
+  const _TimerPreview({
+    required this.warningSeconds,
+    required this.urgentSeconds,
+  });
+
+  final int warningSeconds;
+  final int urgentSeconds;
+
   @override
-  Widget build(BuildContext context) => const Row(
+  Widget build(BuildContext context) => Row(
     children: [
-      _Preview(
+      const _Preview(
         color: Color(0xFF02D53C),
         foregroundColor: Color(0xFF05090C),
-        label: '00:03:00',
+        label: '00:00:00',
       ),
-      SizedBox(width: 8),
+      const SizedBox(width: 8),
       _Preview(
         color: Color(0xFFFFEF00),
         foregroundColor: Color(0xFF05090C),
-        label: '00:05:00',
+        label: _formatTimer(warningSeconds),
       ),
-      SizedBox(width: 8),
+      const SizedBox(width: 8),
       _Preview(
         color: Color(0xFFFF1C2C),
         foregroundColor: Color(0xFF05090C),
-        label: '00:10:00',
+        label: _formatTimer(urgentSeconds),
       ),
     ],
   );
+}
+
+String _formatTimer(int totalSeconds) {
+  final duration = Duration(seconds: totalSeconds);
+  final hours = duration.inHours.toString().padLeft(2, '0');
+  final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+  final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+  return '$hours:$minutes:$seconds';
 }
 
 class _Preview extends StatelessWidget {

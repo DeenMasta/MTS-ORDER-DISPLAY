@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/app_colors.dart';
 import '../view_models/pairing_view_model.dart';
 
 class PairingScreen extends StatefulWidget {
@@ -41,18 +42,30 @@ class _PairingScreenState extends State<PairingScreen> {
   @override
   Widget build(BuildContext context) => Theme(
     data: ThemeData(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFFA44C2E),
+      colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary).copyWith(
+        primary: AppColors.primary,
+        onPrimary: Colors.white,
+        secondary: AppColors.primaryMuted,
+        surface: AppColors.surface,
+        onSurface: AppColors.text,
+        outline: AppColors.outline,
       ),
       useMaterial3: true,
+      filledButtonTheme: const FilledButtonThemeData(
+        style: AppButtonStyles.filled,
+      ),
+      outlinedButtonTheme: const OutlinedButtonThemeData(
+        style: AppButtonStyles.outlined,
+      ),
+      textButtonTheme: const TextButtonThemeData(style: AppButtonStyles.text),
       inputDecorationTheme: const InputDecorationTheme(
         filled: true,
-        fillColor: Color(0xFFFFFFFF),
+        fillColor: AppColors.surfaceRaised,
         border: OutlineInputBorder(),
       ),
     ),
     child: Scaffold(
-      backgroundColor: const Color(0xFFF7F5F0),
+      backgroundColor: AppColors.canvas,
       body: Stack(
         children: [
           const Positioned.fill(child: _BrandPatternBackground()),
@@ -96,7 +109,10 @@ class _BrandPatternBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Stack(
     fit: StackFit.expand,
-    children: [Image.asset('assets/images/kds_background.png', fit: BoxFit.cover)],
+    children: [
+      Image.asset('assets/images/kds_background.png', fit: BoxFit.cover),
+      const ColoredBox(color: Color(0x55FFE0F0)),
+    ],
   );
 }
 
@@ -125,9 +141,9 @@ class _PairingCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(24),
     decoration: BoxDecoration(
-      color: const Color(0xF2FFFCF9),
+      color: const Color(0xF2FFF0F7),
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: const Color(0xFFD5DAD8)),
+      border: Border.all(color: AppColors.outline),
       boxShadow: const [
         BoxShadow(
           color: Color(0x66000000),
@@ -139,14 +155,16 @@ class _PairingCard extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Center(child: Image.asset('assets/images/mysztech_logo.png', height: 42)),
+        Center(
+          child: Image.asset('assets/images/mysztech_logo.png', height: 42),
+        ),
         const SizedBox(height: 24),
         Text(
           waiting ? 'Confirm pairing' : 'Set up your order display',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
         Text(
@@ -154,9 +172,9 @@ class _PairingCard extends StatelessWidget {
               ? 'Approve this display from the POS to finish setup.'
               : 'Connect this screen to your POS in two quick steps.',
           textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-            color: const Color(0xFF52616B),
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodyLarge?.copyWith(color: AppColors.mutedText),
         ),
         const SizedBox(height: 28),
         if (waiting)
@@ -213,7 +231,7 @@ class _SetupForm extends StatelessWidget {
       ),
       const Padding(
         padding: EdgeInsets.symmetric(vertical: 24),
-        child: Divider(color: Color(0xFFD5DAD8)),
+        child: Divider(color: AppColors.outline),
       ),
       const _StepHeading(number: '2', title: 'Name this screen'),
       const SizedBox(height: 12),
@@ -237,9 +255,7 @@ class _SetupForm extends StatelessWidget {
         onPressed: onStartPairing,
         icon: const Icon(Icons.link),
         label: const Text('Pair display'),
-        style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(52),
-        ),
+        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
       ),
       const SizedBox(height: 14),
       const _Hint(
@@ -263,9 +279,9 @@ class _WaitingForApproval extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFFFFF),
+          color: AppColors.surfaceRaised,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFD5DAD8)),
+          border: Border.all(color: AppColors.outline),
         ),
         child: Column(
           children: [
@@ -281,7 +297,7 @@ class _WaitingForApproval extends StatelessWidget {
               const Text(
                 'PAIRING CODE',
                 style: TextStyle(
-                  color: Color(0xFF52616B),
+                  color: AppColors.mutedText,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 1.2,
@@ -310,9 +326,7 @@ class _WaitingForApproval extends StatelessWidget {
         onPressed: onCancel,
         icon: const Icon(Icons.close),
         label: const Text('Cancel pairing'),
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size.fromHeight(48),
-        ),
+        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
       ),
     ],
   );
@@ -332,7 +346,7 @@ class _StepHeading extends StatelessWidget {
         height: 28,
         alignment: Alignment.center,
         decoration: const BoxDecoration(
-          color: Color(0xFFA44C2E),
+          color: AppColors.primary,
           shape: BoxShape.circle,
         ),
         child: Text(
@@ -359,14 +373,14 @@ class _Hint extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Icon(icon, size: 18, color: const Color(0xFF52616B)),
+      Icon(icon, size: 18, color: AppColors.mutedText),
       const SizedBox(width: 8),
       Expanded(
         child: Text(
           text,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: const Color(0xFF52616B),
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppColors.mutedText),
         ),
       ),
     ],
@@ -382,7 +396,7 @@ class _ErrorMessage extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(
-      color: const Color(0xFFFFE8E8),
+      color: const Color(0xFFFFEDF3),
       borderRadius: BorderRadius.circular(12),
       border: Border.all(color: Theme.of(context).colorScheme.error),
     ),
