@@ -96,4 +96,26 @@ void main() {
       '0.5',
     );
   });
+
+  test('keeps local finished and retrieved receipt metadata', () {
+    final ticket = KitchenTicket.fromJson({
+      'message_id': 'message-3',
+      'sale_id': 'sale-3',
+      'department_id': 'department-1',
+      'revision': 1,
+      'action': 'upsert',
+      'order_number': 106,
+      'created_at': '2026-10-29T10:30:00+08:00',
+      'finished_at': '2026-10-29T10:37:12+08:00',
+      'is_retrieved': true,
+      'items': const [],
+    });
+
+    expect(ticket.finishedAt, DateTime.parse('2026-10-29T10:37:12+08:00'));
+    expect(ticket.isRetrieved, isTrue);
+
+    final restored = KitchenTicket.fromJson(ticket.toJson());
+    expect(restored.finishedAt, ticket.finishedAt);
+    expect(restored.isRetrieved, isTrue);
+  });
 }

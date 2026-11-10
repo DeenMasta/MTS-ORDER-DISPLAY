@@ -229,6 +229,54 @@ void main() {
     expect(settingsRepository.value.urgentThresholdSeconds, 75);
   });
 
+  test('uses the configured Finished receipt delay', () async {
+    final settingsRepository = _FakeSettingsRepository()
+      ..value = const KdsSettings(finishedReceiptSeconds: 25);
+    final ticket = _ticket('1', 'Dine In');
+    final viewModel = KitchenBoardViewModel(
+      repository: _FakeKitchenRepository([ticket]),
+      settingsRepository: settingsRepository,
+    );
+    addTearDown(viewModel.dispose);
+
+    await viewModel.start(_session);
+    await viewModel.completeLocally([ticket]);
+
+    expect(
+      viewModel.completionSecondsRemaining([ticket]),
+      inInclusiveRange(24, 25),
+    );
+  });
+
+  test('calculates the completion duration recorded for a receipt', () {
+    final startedAt = DateTime(2026, 11, 9, 10);
+    final ticket = _ticket('1', 'Dine In').copyWith(
+      finishedAt: startedAt.add(const Duration(minutes: 7, seconds: 12)),
+    );
+    final viewModel = KitchenBoardViewModel(
+      repository: _FakeKitchenRepository(const []),
+      settingsRepository: _FakeSettingsRepository(),
+    );
+    addTearDown(viewModel.dispose);
+
+    expect(
+      viewModel.completionDurationFor([
+        KitchenTicket(
+          messageId: ticket.messageId,
+          saleId: ticket.saleId,
+          departmentId: ticket.departmentId,
+          revision: ticket.revision,
+          action: ticket.action,
+          orderNumber: ticket.orderNumber,
+          createdAt: startedAt,
+          items: ticket.items,
+          finishedAt: ticket.finishedAt,
+        ),
+      ]),
+      const Duration(minutes: 7, seconds: 12),
+    );
+  });
+
   test(
     'plays the selected new-order template once for a received order',
     () async {
@@ -328,7 +376,7 @@ void main() {
   });
 
   test(
-    'finishes a receipt locally and allows it to be restored during countdown',
+    'returns a dashboard Finished receipt without marking it retrieved',
     () async {
       final ticket = _ticket('1', 'Dine In');
       final repository = _FakeKitchenRepository([ticket]);
@@ -358,7 +406,9 @@ void main() {
       expect(viewModel.todayHistoryGroups, isEmpty);
       expect(viewModel.ticketGroups, hasLength(1));
       expect(viewModel.ticketGroups.single.first.orderNumber, '1');
+      expect(viewModel.isRetrieved(viewModel.ticketGroups.single), isFalse);
       expect(repository.restoreCalls, 1);
+      expect(repository.restoreIndicators, [false]);
     },
   );
 
@@ -408,12 +458,17 @@ void main() {
     await restartedDisplay.start(_session);
 
     final historyReceipt = restartedDisplay.todayHistoryGroups.single;
-    await restartedDisplay.undoLocalCompletion(historyReceipt);
+    await restartedDisplay.retrieveFromHistory(historyReceipt);
 
     expect(restartedDisplay.todayHistoryGroups, isEmpty);
     expect(restartedDisplay.ticketGroups, hasLength(1));
     expect(restartedDisplay.ticketGroups.single.first.orderNumber, '1');
+    expect(
+      restartedDisplay.isRetrieved(restartedDisplay.ticketGroups.single),
+      isTrue,
+    );
     expect(repository.restoreCalls, 1);
+    expect(repository.restoreIndicators, [true]);
   });
 
   test('loads persisted finished receipts into today history', () async {
@@ -477,6 +532,7 @@ class _FakeKitchenRepository implements KitchenRepository {
   int dismissCalls = 0;
   int finishCalls = 0;
   int restoreCalls = 0;
+  final List<bool> restoreIndicators = <bool>[];
   int historyCalls = 0;
 
   void addTicket(KitchenTicket ticket) => _tickets.add(ticket);
@@ -517,8 +573,12 @@ class _FakeKitchenRepository implements KitchenRepository {
   }
 
   @override
-  Future<void> restoreFinished(List<String> ticketIds) async {
+  Future<void> restoreFinished(
+    List<String> ticketIds, {
+    required bool markRetrieved,
+  }) async {
     restoreCalls++;
+    restoreIndicators.add(markRetrieved);
     _finishedTicketIds.removeAll(ticketIds);
   }
 

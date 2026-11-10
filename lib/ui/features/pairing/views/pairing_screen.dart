@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/app_colors.dart';
+import '../../../core/app_constants.dart';
 import '../view_models/pairing_view_model.dart';
 
 class PairingScreen extends StatefulWidget {
@@ -110,7 +111,7 @@ class _BrandPatternBackground extends StatelessWidget {
   Widget build(BuildContext context) => Stack(
     fit: StackFit.expand,
     children: [
-      Image.asset('assets/images/kds_background.png', fit: BoxFit.cover),
+      Image.asset(AppAssets.brandPatternBackground, fit: BoxFit.cover),
       const ColoredBox(color: Color(0x55FFE0F0)),
     ],
   );
@@ -155,9 +156,7 @@ class _PairingCard extends StatelessWidget {
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Center(
-          child: Image.asset('assets/images/mysztech_logo.png', height: 42),
-        ),
+        Center(child: Image.asset(AppAssets.mysztechLogo, height: 42)),
         const SizedBox(height: 24),
         Text(
           waiting ? 'Confirm pairing' : 'Set up your order display',

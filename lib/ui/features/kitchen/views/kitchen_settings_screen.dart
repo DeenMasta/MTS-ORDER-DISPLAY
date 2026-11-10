@@ -30,6 +30,7 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
   late KdsSettings _draft;
   late final TextEditingController _warningTimerController;
   late final TextEditingController _urgentTimerController;
+  late final TextEditingController _finishedDelayController;
   List<KdsOrderType> _orderTypes = const [];
   bool _loadingOrderTypes = true;
   Timer? _timerSaveDebounce;
@@ -45,6 +46,9 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
     _urgentTimerController = TextEditingController(
       text: _formatTimerInput(_draft.urgentThresholdSeconds),
     );
+    _finishedDelayController = TextEditingController(
+      text: _draft.finishedReceiptSeconds.toString(),
+    );
     _loadOrderTypes();
   }
 
@@ -53,6 +57,7 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
     _timerSaveDebounce?.cancel();
     _warningTimerController.dispose();
     _urgentTimerController.dispose();
+    _finishedDelayController.dispose();
     super.dispose();
   }
 
@@ -73,12 +78,20 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
     final urgentThresholdSeconds = _parseTimerInput(
       _urgentTimerController.text,
     );
+    final finishedReceiptSeconds = int.tryParse(
+      _finishedDelayController.text.trim(),
+    );
     if (warningThresholdSeconds == null ||
         urgentThresholdSeconds == null ||
+        finishedReceiptSeconds == null ||
         warningThresholdSeconds <= 0 ||
-        warningThresholdSeconds >= urgentThresholdSeconds) {
+        warningThresholdSeconds >= urgentThresholdSeconds ||
+        finishedReceiptSeconds < 1 ||
+        finishedReceiptSeconds > 300) {
       if (showValidationMessage) {
-        _message('Use MM:SS. Yellow must be above 00:00 and before red.');
+        _message(
+          'Use valid timers. Finished receipt delay must be 1 to 300 seconds.',
+        );
       }
       return;
     }
@@ -90,6 +103,7 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
         warningSeconds: warningThresholdSeconds % 60,
         urgentMinutes: urgentThresholdSeconds ~/ 60,
         urgentSeconds: urgentThresholdSeconds % 60,
+        finishedReceiptSeconds: finishedReceiptSeconds,
       ),
     );
   }
@@ -124,6 +138,7 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
     _urgentTimerController.text = _formatTimerInput(
       restored.urgentThresholdSeconds,
     );
+    _finishedDelayController.text = restored.finishedReceiptSeconds.toString();
   }
 
   Future<void> _loadOrderTypes() async {
@@ -545,6 +560,35 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                       ),
               ),
               const SizedBox(height: 12),
+              SizedBox(
+                width: 280,
+                child: TextField(
+                  controller: _finishedDelayController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(3),
+                  ],
+                  onTap: () =>
+                      _finishedDelayController.selection = TextSelection(
+                        baseOffset: 0,
+                        extentOffset: _finishedDelayController.text.length,
+                      ),
+                  onChanged: (_) => _scheduleTimerSave(),
+                  onSubmitted: (_) => unawaited(
+                    _saveTimerThresholds(showValidationMessage: true),
+                  ),
+                  onTapOutside: (_) => unawaited(
+                    _saveTimerThresholds(showValidationMessage: true),
+                  ),
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    labelText: 'Finished receipt delay (seconds)',
+                    helperText: 'How long Finished stays visible (1–300).',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
               const Text(
                 'Type four digits (for example, 1000 becomes 10:00). Yellow must be above 00:00 and before red.',
               ),
@@ -704,6 +748,10 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
     controller: controller,
     keyboardType: TextInputType.datetime,
     inputFormatters: const [_TimerInputFormatter()],
+    onTap: () => controller.selection = TextSelection(
+      baseOffset: 0,
+      extentOffset: controller.text.length,
+    ),
     onChanged: (_) => _scheduleTimerSave(),
     onSubmitted: (_) =>
         unawaited(_saveTimerThresholds(showValidationMessage: true)),

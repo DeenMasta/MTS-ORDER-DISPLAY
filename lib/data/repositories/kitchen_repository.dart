@@ -15,7 +15,16 @@ abstract interface class KitchenRepository {
 
   Future<List<KitchenTicket>> dismiss(String ticketId);
   Future<void> markFinished(List<String> ticketIds);
-  Future<void> restoreFinished(List<String> ticketIds);
+
+  /// Returns local Finished receipts to the dashboard.
+  ///
+  /// [markRetrieved] is true only when the user explicitly retrieves a
+  /// receipt from Order History. Undoing Finished from the dashboard must not
+  /// show the retrieved indicator.
+  Future<void> restoreFinished(
+    List<String> ticketIds, {
+    required bool markRetrieved,
+  });
   Future<List<KitchenTicket>> historyForDay(DateTime day);
   Future<List<KitchenTicket>> start(DisplaySession session);
   Future<List<KdsOrderType>> orderTypes();
@@ -79,8 +88,10 @@ class StoredKitchenRepository implements KitchenRepository {
       _store.markFinished(ticketIds);
 
   @override
-  Future<void> restoreFinished(List<String> ticketIds) =>
-      _store.restoreFinished(ticketIds);
+  Future<void> restoreFinished(
+    List<String> ticketIds, {
+    required bool markRetrieved,
+  }) => _store.restoreFinished(ticketIds, markRetrieved: markRetrieved);
 
   @override
   Future<List<KitchenTicket>> historyForDay(DateTime day) =>

@@ -6,6 +6,7 @@ import '../../../../domain/models/display_session.dart';
 import '../../../../domain/models/kds_settings.dart';
 import '../../../../domain/models/kitchen_ticket.dart';
 import '../../../core/app_colors.dart';
+import '../../../core/app_constants.dart';
 import '../../../core/order_type_icon_library.dart';
 import '../view_models/kitchen_board_view_model.dart';
 import 'kitchen_history_screen.dart';
@@ -103,13 +104,8 @@ class _BrandPatternBackground extends StatelessWidget {
   const _BrandPatternBackground();
 
   @override
-  Widget build(BuildContext context) => Stack(
-    fit: StackFit.expand,
-    children: [
-      Image.asset('assets/images/kds_background.png', fit: BoxFit.cover),
-      const ColoredBox(color: Color(0x55FFE0F0)),
-    ],
-  );
+  Widget build(BuildContext context) =>
+      Image.asset(AppAssets.brandPatternBackground, fit: BoxFit.cover);
 }
 
 class _KitchenBoardBody extends StatelessWidget {
@@ -189,6 +185,7 @@ class _KitchenBoardBody extends StatelessWidget {
                         groups: viewModel.ticketGroups,
                         iconNameFor: viewModel.orderTypeIconNameFor,
                         settings: viewModel.settings,
+                        isRetrieved: viewModel.isRetrieved,
                         isCrossed: viewModel.isItemCrossed,
                         onToggle: viewModel.toggleItemCrossed,
                         completionSecondsRemaining:
@@ -261,12 +258,12 @@ class _Header extends StatelessWidget {
     height: compact ? 52 : 58,
     padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 16),
     decoration: BoxDecoration(
-      color: _boardBackground,
+      color: AppColors.surfaceRaised,
       borderRadius: BorderRadius.circular(12),
       border: Border.all(color: AppColors.outline),
       boxShadow: const [
         BoxShadow(
-          color: Color(0x33000000),
+          color: Color(0x1FC00050),
           blurRadius: 14,
           offset: Offset(0, 5),
         ),
@@ -283,10 +280,7 @@ class _Header extends StatelessWidget {
           ),
         ),
         const Spacer(),
-        Image.asset(
-          'assets/images/mysztech_logo.png',
-          height: compact ? 27 : 37,
-        ),
+        Image.asset(AppAssets.mysztechLogo, height: compact ? 27 : 37),
         const Spacer(),
         IconButton(
           tooltip: 'Display menu',
@@ -324,7 +318,7 @@ class _KitchenSideMenu extends StatelessWidget {
     );
     return Drawer(
       width: width,
-      backgroundColor: _boardBackground,
+      backgroundColor: AppColors.surface,
       surfaceTintColor: Colors.transparent,
       child: SafeArea(
         child: Column(
@@ -337,7 +331,7 @@ class _KitchenSideMenu extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Image.asset('assets/images/mysztech_logo.png', height: 32),
+                  Image.asset(AppAssets.mysztechLogo, height: 32),
                   const Spacer(),
                   IconButton(
                     tooltip: 'Close menu',
@@ -431,7 +425,7 @@ class _SideMenuItem extends StatelessWidget {
         color: AppColors.primarySoft,
         borderRadius: BorderRadius.circular(11),
       ),
-      child: Icon(icon, color: _boardForeground),
+      child: Icon(icon, color: AppColors.primary),
     ),
     title: Text(
       label,
@@ -467,15 +461,17 @@ class _FilterBar extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                   color: viewModel.filter == filter
                       ? Colors.white
-                      : Colors.black,
+                      : AppColors.primaryDark,
                 ),
-                selectedColor: Colors.black,
-                backgroundColor: AppColors.surfaceRaised,
+                selectedColor: AppColors.primary,
+                backgroundColor: AppColors.surface,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 13,
                   vertical: 6,
                 ),
-                shape: const StadiumBorder(),
+                shape: const StadiumBorder(
+                  side: BorderSide(color: AppColors.outline),
+                ),
               ),
             ),
           )
@@ -491,6 +487,7 @@ class _TicketPager extends StatefulWidget {
     required this.groups,
     required this.iconNameFor,
     required this.settings,
+    required this.isRetrieved,
     required this.isCrossed,
     required this.onToggle,
     required this.completionSecondsRemaining,
@@ -502,6 +499,7 @@ class _TicketPager extends StatefulWidget {
   final List<List<KitchenTicket>> groups;
   final String Function(KitchenTicket) iconNameFor;
   final KdsSettings settings;
+  final bool Function(List<KitchenTicket>) isRetrieved;
   final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
   final void Function(KitchenTicket ticket, int itemIndex) onToggle;
   final int Function(List<KitchenTicket>) completionSecondsRemaining;
@@ -572,6 +570,7 @@ class _TicketPagerState extends State<_TicketPager> {
             .toList(growable: false),
         iconNameFor: widget.iconNameFor,
         settings: widget.settings,
+        isRetrieved: widget.isRetrieved,
         isCrossed: widget.isCrossed,
         onToggle: widget.onToggle,
         completionSecondsRemaining: widget.completionSecondsRemaining,
@@ -587,6 +586,7 @@ class _TicketGrid extends StatelessWidget {
     required this.groups,
     required this.iconNameFor,
     required this.settings,
+    required this.isRetrieved,
     required this.isCrossed,
     required this.onToggle,
     required this.completionSecondsRemaining,
@@ -596,6 +596,7 @@ class _TicketGrid extends StatelessWidget {
   final List<List<KitchenTicket>> groups;
   final String Function(KitchenTicket) iconNameFor;
   final KdsSettings settings;
+  final bool Function(List<KitchenTicket>) isRetrieved;
   final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
   final void Function(KitchenTicket ticket, int itemIndex) onToggle;
   final int Function(List<KitchenTicket>) completionSecondsRemaining;
@@ -631,6 +632,7 @@ class _TicketGrid extends StatelessWidget {
           tickets: groups[index],
           iconName: iconNameFor(groups[index].first),
           settings: settings,
+          isRetrieved: isRetrieved(groups[index]),
           isCrossed: isCrossed,
           onToggle: onToggle,
           secondsRemaining: completionSecondsRemaining(groups[index]),
@@ -647,6 +649,7 @@ class _TicketCard extends StatelessWidget {
     required this.tickets,
     required this.iconName,
     required this.settings,
+    required this.isRetrieved,
     required this.isCrossed,
     required this.onToggle,
     required this.secondsRemaining,
@@ -656,6 +659,7 @@ class _TicketCard extends StatelessWidget {
   final List<KitchenTicket> tickets;
   final String iconName;
   final KdsSettings settings;
+  final bool isRetrieved;
   final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
   final void Function(KitchenTicket ticket, int itemIndex) onToggle;
   final int secondsRemaining;
@@ -664,6 +668,8 @@ class _TicketCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ticket = tickets.first;
+    final orderer = ticket.displayOrderer;
+    final orderFor = ticket.orderFor;
     final elapsed = DateTime.now().difference(ticket.createdAt.toLocal());
     final accent = elapsed.inSeconds >= settings.urgentThresholdSeconds
         ? const Color(0xFFFF1C2C)
@@ -673,7 +679,7 @@ class _TicketCard extends StatelessWidget {
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
-      color: AppColors.surface,
+      color: Colors.white,
       child: Column(
         children: [
           SizedBox(
@@ -794,28 +800,87 @@ class _TicketCard extends StatelessWidget {
                       ),
                       if (ticket.tableName case final table?
                           when table.isNotEmpty)
-                        Flexible(
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 8),
-                            child: Text(
-                              'Table $table',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.end,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                              ),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: Text(
+                            'Table $table',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.end,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),
                     ],
                   ),
                   const Divider(height: 22, thickness: 1),
-                  if (ticket.displayOrderer case final orderer?)
-                    Text('Ordered by: $orderer', style: _detailStyle),
-                  if (ticket.orderFor case final orderFor?)
-                    Text('Order for: $orderFor', style: _detailStyle),
+                  if (orderer != null || orderFor != null || isRetrieved)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (orderer != null)
+                                Text(
+                                  'Ordered by: $orderer',
+                                  style: _detailStyle,
+                                ),
+                              if (orderFor != null)
+                                Text(
+                                  'Order for: $orderFor',
+                                  style: _detailStyle,
+                                ),
+                            ],
+                          ),
+                        ),
+                        if (isRetrieved) ...[
+                          const SizedBox(width: 6),
+                          Semantics(
+                            label: 'Reopened from order history',
+                            child: Tooltip(
+                              message: 'Reopened from order history',
+                              child: const DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: AppColors.primarySoft,
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(99),
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 9,
+                                    vertical: 6,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.restore_rounded,
+                                        color: AppColors.primary,
+                                        size: 18,
+                                      ),
+                                      SizedBox(width: 5),
+                                      Text(
+                                        'Reopen',
+                                        style: TextStyle(
+                                          color: AppColors.primaryDark,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   if (ticket.displayRemarks case final remarks?)
                     Text('Remarks: $remarks', style: _detailStyle),
                   const Divider(height: 18, thickness: 1),
@@ -947,7 +1012,7 @@ class _Pager extends StatelessWidget {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(99),
                   color: index == viewModel.page
-                      ? _boardForeground
+                      ? AppColors.primary
                       : AppColors.outline,
                 ),
               ),

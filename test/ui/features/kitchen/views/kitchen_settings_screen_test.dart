@@ -71,7 +71,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(TextField), findsNWidgets(2));
+    expect(find.byType(TextField), findsNWidgets(3));
     await tester.enterText(find.byType(TextField).first, '07:00');
     await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
@@ -80,6 +80,33 @@ void main() {
     expect(settingsRepository.savedSettings.single.warningMinutes, 7);
     expect(settingsRepository.savedSettings.single.warningSeconds, isZero);
     expect(settingsRepository.savedSettings.single.urgentMinutes, 10);
+  });
+
+  testWidgets('saves the Finished receipt delay automatically', (tester) async {
+    final settingsRepository = _RecordingSettingsRepository();
+    final viewModel = KitchenBoardViewModel(
+      repository: _EmptyKitchenRepository(),
+      settingsRepository: settingsRepository,
+    );
+    addTearDown(viewModel.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: KitchenSettingsScreen(
+          viewModel: viewModel,
+          session: _session,
+          onChangeConnection: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).at(2), '25');
+    await tester.pump(const Duration(milliseconds: 700));
+    await tester.pump();
+
+    expect(settingsRepository.savedSettings, hasLength(1));
+    expect(settingsRepository.savedSettings.single.finishedReceiptSeconds, 25);
   });
 
   testWidgets('saves a combined timer and formats seconds with two digits', (
@@ -161,6 +188,12 @@ void main() {
     await tester.pumpAndSettle();
 
     final timerField = find.byType(TextField).first;
+    await tester.tap(timerField);
+    await tester.pump();
+    expect(
+      tester.widget<TextField>(timerField).controller!.selection,
+      const TextSelection(baseOffset: 0, extentOffset: 5),
+    );
     await tester.enterText(timerField, '1000');
 
     expect(tester.widget<TextField>(timerField).controller!.text, '10:00');
@@ -211,7 +244,10 @@ class _EmptyKitchenRepository implements KitchenRepository {
   Future<List<KdsOrderType>> orderTypes() async => const [];
 
   @override
-  Future<void> restoreFinished(List<String> ticketIds) async {}
+  Future<void> restoreFinished(
+    List<String> ticketIds, {
+    required bool markRetrieved,
+  }) async {}
 
   @override
   Future<List<KitchenTicket>> start(DisplaySession session) async => const [];

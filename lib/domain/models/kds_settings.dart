@@ -69,6 +69,7 @@ class KdsSettings {
     this.warningSeconds = 0,
     this.urgentMinutes = 10,
     this.urgentSeconds = 0,
+    this.finishedReceiptSeconds = 10,
     this.largeText = false,
     this.compactCards = false,
     this.newestFirst = false,
@@ -83,6 +84,7 @@ class KdsSettings {
   final int warningSeconds;
   final int urgentMinutes;
   final int urgentSeconds;
+  final int finishedReceiptSeconds;
   final bool largeText;
   final bool compactCards;
   final bool newestFirst;
@@ -130,6 +132,7 @@ class KdsSettings {
     int? warningSeconds,
     int? urgentMinutes,
     int? urgentSeconds,
+    int? finishedReceiptSeconds,
     bool? largeText,
     bool? compactCards,
     bool? newestFirst,
@@ -143,6 +146,8 @@ class KdsSettings {
     warningSeconds: warningSeconds ?? this.warningSeconds,
     urgentMinutes: urgentMinutes ?? this.urgentMinutes,
     urgentSeconds: urgentSeconds ?? this.urgentSeconds,
+    finishedReceiptSeconds:
+        finishedReceiptSeconds ?? this.finishedReceiptSeconds,
     largeText: largeText ?? this.largeText,
     compactCards: compactCards ?? this.compactCards,
     newestFirst: newestFirst ?? this.newestFirst,
@@ -158,6 +163,7 @@ class KdsSettings {
     'warning_seconds': warningSeconds,
     'urgent_minutes': urgentMinutes,
     'urgent_seconds': urgentSeconds,
+    'finished_receipt_seconds': finishedReceiptSeconds,
     'large_text': largeText,
     'compact_cards': compactCards,
     'newest_first': newestFirst,
@@ -173,6 +179,7 @@ class KdsSettings {
     warningSeconds: json['warning_seconds'] as int? ?? 0,
     urgentMinutes: json['urgent_minutes'] as int? ?? 10,
     urgentSeconds: json['urgent_seconds'] as int? ?? 0,
+    finishedReceiptSeconds: json['finished_receipt_seconds'] as int? ?? 10,
     largeText: json['large_text'] as bool? ?? false,
     compactCards: json['compact_cards'] as bool? ?? false,
     newestFirst: json['newest_first'] as bool? ?? false,

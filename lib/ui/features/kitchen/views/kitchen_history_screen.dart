@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../domain/models/kitchen_ticket.dart';
 import '../../../core/app_colors.dart';
+import '../../../core/app_constants.dart';
 import '../view_models/kitchen_board_view_model.dart';
 
 class KitchenHistoryScreen extends StatefulWidget {
@@ -21,7 +22,7 @@ class _KitchenHistoryScreenState extends State<KitchenHistoryScreen> {
   }
 
   Future<void> _restoreToDashboard(List<KitchenTicket> tickets) async {
-    await widget.viewModel.undoLocalCompletion(tickets);
+    await widget.viewModel.retrieveFromHistory(tickets);
     if (mounted) Navigator.of(context).pop();
   }
 
@@ -34,10 +35,7 @@ class _KitchenHistoryScreenState extends State<KitchenHistoryScreen> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              Image.asset(
-                'assets/images/kds_background.png',
-                fit: BoxFit.cover,
-              ),
+              Image.asset(AppAssets.brandPatternBackground, fit: BoxFit.cover),
               const ColoredBox(color: Color(0x55FFE0F0)),
             ],
           ),
@@ -86,7 +84,7 @@ class _KitchenHistoryScreenState extends State<KitchenHistoryScreen> {
                           ),
                         ),
                         Image.asset(
-                          'assets/images/mysztech_logo.png',
+                          AppAssets.mysztechLogo,
                           height: compact ? 20 : 28,
                         ),
                       ],
@@ -115,6 +113,9 @@ class _KitchenHistoryScreenState extends State<KitchenHistoryScreen> {
                               finished: widget.viewModel.isCompletedLocally(
                                 tickets,
                               ),
+                              retrieved: widget.viewModel.isRetrieved(tickets),
+                              completionDuration: widget.viewModel
+                                  .completionDurationFor(tickets),
                               onTap: () => _restoreToDashboard(tickets),
                             );
                           },
@@ -160,11 +161,15 @@ class _HistoryReceipt extends StatelessWidget {
   const _HistoryReceipt({
     required this.tickets,
     required this.finished,
+    required this.retrieved,
+    required this.completionDuration,
     required this.onTap,
   });
 
   final List<KitchenTicket> tickets;
   final bool finished;
+  final bool retrieved;
+  final Duration? completionDuration;
   final VoidCallback onTap;
 
   @override
@@ -197,6 +202,10 @@ class _HistoryReceipt extends StatelessWidget {
                   const SizedBox(width: 8),
                   const _FinishedBadge(),
                 ],
+                if (retrieved) ...[
+                  const SizedBox(width: 6),
+                  const _RetrievedBadge(),
+                ],
                 const Spacer(),
                 Text(
                   _timeLabel(ticket.createdAt.toLocal()),
@@ -222,6 +231,27 @@ class _HistoryReceipt extends StatelessWidget {
                 fontSize: 12,
               ),
             ),
+            if (completionDuration case final duration?) ...[
+              const SizedBox(height: 7),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.timer_outlined,
+                    size: 15,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Completed in ${_completionDurationLabel(duration)}',
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 10),
               child: Divider(color: AppColors.outline, height: 1),
@@ -272,6 +302,28 @@ class _FinishedBadge extends StatelessWidget {
   );
 }
 
+class _RetrievedBadge extends StatelessWidget {
+  const _RetrievedBadge();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    decoration: BoxDecoration(
+      color: AppColors.primary,
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: const Text(
+      'RETRIEVED',
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: 9,
+        fontWeight: FontWeight.w900,
+        letterSpacing: .5,
+      ),
+    ),
+  );
+}
+
 class KitchenHistoryDetailScreen extends StatelessWidget {
   const KitchenHistoryDetailScreen({
     super.key,
@@ -294,7 +346,7 @@ class KitchenHistoryDetailScreen extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 Image.asset(
-                  'assets/images/kds_background.png',
+                  AppAssets.brandPatternBackground,
                   fit: BoxFit.cover,
                 ),
                 const ColoredBox(color: Color(0x55FFE0F0)),
@@ -330,7 +382,7 @@ class KitchenHistoryDetailScreen extends StatelessWidget {
                             ),
                           ),
                           Image.asset(
-                            'assets/images/mysztech_logo.png',
+                            AppAssets.mysztechLogo,
                             height: compact ? 20 : 28,
                           ),
                         ],
@@ -574,4 +626,12 @@ String _historyDateTime(DateTime value) {
   final day = local.day.toString().padLeft(2, '0');
   final month = local.month.toString().padLeft(2, '0');
   return '$day/$month/${local.year}  $hour:$minute ${local.hour >= 12 ? 'PM' : 'AM'}';
+}
+
+String _completionDurationLabel(Duration value) {
+  final totalSeconds = value.inSeconds;
+  final minutes = totalSeconds ~/ 60;
+  final seconds = totalSeconds % 60;
+  if (minutes == 0) return '${seconds}s';
+  return '${minutes}m ${seconds.toString().padLeft(2, '0')}s';
 }

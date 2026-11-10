@@ -15,17 +15,11 @@ class TicketStore {
   Future<List<KitchenTicket>> activeTickets() async {
     final rows = await (await _db).database.query(
       'tickets',
-      where: 'status = ?',
-      whereArgs: ['active'],
+      where: 'status IN (?, ?)',
+      whereArgs: ['active', 'retrieved'],
       orderBy: 'updated_at ASC',
     );
-    return rows
-        .map(
-          (row) => KitchenTicket.fromJson(
-            jsonDecode(row['payload_json']! as String) as Map<String, dynamic>,
-          ),
-        )
-        .toList(growable: false);
+    return rows.map(_ticketFromRow).toList(growable: false);
   }
 
   /// Returns the receipts marked Finished on the supplied local calendar day.
@@ -46,11 +40,7 @@ class TicketStore {
       orderBy: 'updated_at DESC',
     );
     return rows
-        .map(
-          (row) => KitchenTicket.fromJson(
-            jsonDecode(row['payload_json']! as String) as Map<String, dynamic>,
-          ),
-        )
+        .map((row) => _ticketFromRow(row, includeFinishedAt: true))
         .toList(growable: false);
   }
 
@@ -133,9 +123,30 @@ class TicketStore {
   Future<void> markFinished(Iterable<String> ticketIds) =>
       _setTicketStatus(ticketIds, status: 'dismissed');
 
-  /// Restores a receipt during its short Finished countdown.
-  Future<void> restoreFinished(Iterable<String> ticketIds) =>
-      _setTicketStatus(ticketIds, status: 'active');
+  /// Restores a receipt to live orders.
+  ///
+  /// The retrieved status is reserved for the explicit Order History action.
+  /// Undoing the Finished countdown returns the receipt to its normal active
+  /// state so it cannot show a misleading retrieved indicator.
+  Future<void> restoreFinished(
+    Iterable<String> ticketIds, {
+    required bool markRetrieved,
+  }) => _setTicketStatus(
+    ticketIds,
+    status: markRetrieved ? 'retrieved' : 'active',
+  );
+
+  KitchenTicket _ticketFromRow(
+    Map<String, Object?> row, {
+    bool includeFinishedAt = false,
+  }) {
+    final payload = Map<String, dynamic>.from(
+      jsonDecode(row['payload_json']! as String) as Map,
+    );
+    if (row['status'] == 'retrieved') payload['is_retrieved'] = true;
+    if (includeFinishedAt) payload['finished_at'] = row['updated_at'];
+    return KitchenTicket.fromJson(payload);
+  }
 
   Future<void> _setTicketStatus(
     Iterable<String> ticketIds, {

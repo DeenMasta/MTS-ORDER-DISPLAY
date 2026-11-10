@@ -62,6 +62,8 @@ class KitchenTicket {
     this.orderedBy,
     this.orderFor,
     this.enteredAt,
+    this.finishedAt,
+    this.isRetrieved = false,
     this.orderTypes = const [],
   });
 
@@ -82,6 +84,12 @@ class KitchenTicket {
   final String? orderedBy;
   final String? orderFor;
   final DateTime? enteredAt;
+
+  /// Local timestamp recorded when this display marked the receipt Finished.
+  final DateTime? finishedAt;
+
+  /// Whether this locally finished receipt was retrieved back to live orders.
+  final bool isRetrieved;
   final List<KdsOrderType> orderTypes;
 
   String get id => '$saleId:$departmentId';
@@ -153,6 +161,8 @@ class KitchenTicket {
       orderedBy: json['ordered_by'] as String?,
       orderFor: json['order_for'] as String?,
       enteredAt: DateTime.tryParse(json['entered_at'] as String? ?? ''),
+      finishedAt: DateTime.tryParse(json['finished_at'] as String? ?? ''),
+      isRetrieved: json['is_retrieved'] == true,
       orderTypes: (json['order_types'] as List? ?? const [])
           .whereType<Map>()
           .map((type) => KdsOrderType.fromJson(Map<String, dynamic>.from(type)))
@@ -175,12 +185,38 @@ class KitchenTicket {
     'ordered_by': orderedBy,
     'order_for': orderFor,
     'entered_at': enteredAt?.toIso8601String(),
+    'finished_at': finishedAt?.toIso8601String(),
+    'is_retrieved': isRetrieved,
     'order_types': orderTypes
         .map((type) => type.toJson())
         .toList(growable: false),
     'created_at': createdAt.toIso8601String(),
     'items': items.map((item) => item.toJson()).toList(growable: false),
   };
+
+  KitchenTicket copyWith({DateTime? finishedAt, bool? isRetrieved}) =>
+      KitchenTicket(
+        messageId: messageId,
+        saleId: saleId,
+        departmentId: departmentId,
+        revision: revision,
+        action: action,
+        orderNumber: orderNumber,
+        createdAt: createdAt,
+        items: items,
+        tableName: tableName,
+        orderName: orderName,
+        remarks: remarks,
+        orderTypeId: orderTypeId,
+        orderTypeName: orderTypeName,
+        staffName: staffName,
+        orderedBy: orderedBy,
+        orderFor: orderFor,
+        enteredAt: enteredAt,
+        finishedAt: finishedAt ?? this.finishedAt,
+        isRetrieved: isRetrieved ?? this.isRetrieved,
+        orderTypes: orderTypes,
+      );
 }
 
 class KdsOrderType {

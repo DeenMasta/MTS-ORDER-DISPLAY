@@ -54,6 +54,7 @@ void main() {
       warningSeconds: 30,
       urgentMinutes: 4,
       urgentSeconds: 15,
+      finishedReceiptSeconds: 25,
     );
 
     final restored = KdsSettings.fromJson(settings.toJson());
@@ -64,7 +65,9 @@ void main() {
 
     expect(restored.warningThresholdSeconds, 150);
     expect(restored.urgentThresholdSeconds, 255);
+    expect(restored.finishedReceiptSeconds, 25);
     expect(existingSettings.warningSeconds, isZero);
     expect(existingSettings.urgentSeconds, isZero);
+    expect(existingSettings.finishedReceiptSeconds, 10);
   });
 }

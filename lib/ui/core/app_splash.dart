@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
+import 'app_constants.dart';
 
 /// Brief branded launch state shown while the display restores its session.
 class AppSplash extends StatefulWidget {
@@ -76,7 +77,7 @@ class _MysztechSplash extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Image.asset(
-                        'assets/images/kds_order_display_icon_rose.png',
+                        AppAssets.orderDisplayIcon,
                         width: iconSize,
                         filterQuality: FilterQuality.high,
                       ),

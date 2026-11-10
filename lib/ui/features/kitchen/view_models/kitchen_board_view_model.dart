@@ -132,32 +132,52 @@ class KitchenBoardViewModel extends ChangeNotifier {
   Future<void> completeLocally(List<KitchenTicket> tickets) async {
     if (tickets.isEmpty || isCompletedLocally(tickets)) return;
     final now = DateTime.now();
-    final deadline = now.add(const Duration(seconds: 10));
+    final deadline = now.add(
+      Duration(seconds: _settings.finishedReceiptSeconds),
+    );
     _historyDay = DateTime(now.year, now.month, now.day);
     for (final ticket in tickets) {
       _completionDeadlines[ticket.id] = deadline;
       _locallyCompletedTicketIds.add(ticket.id);
-      _finishedHistoryTickets[ticket.id] = ticket;
+      _finishedHistoryTickets[ticket.id] = ticket.copyWith(finishedAt: now);
     }
     notifyListeners();
     await _repository.markFinished(tickets.map((ticket) => ticket.id).toList());
   }
 
-  /// Restores a finished receipt to this display's live dashboard.
+  /// Cancels the Finished countdown from the live dashboard.
+  ///
+  /// This returns the receipt to its regular active state; it was not
+  /// retrieved from history and must not show the retrieved indicator.
+  Future<void> undoLocalCompletion(List<KitchenTicket> tickets) =>
+      _restoreFinished(tickets, markRetrieved: false);
+
+  /// Retrieves a Finished receipt from Order History back to the dashboard.
+  ///
   /// This changes only this display's local status; it never contacts POS.
-  Future<void> undoLocalCompletion(List<KitchenTicket> tickets) async {
-    final activeTicketIds = _tickets.map((ticket) => ticket.id).toSet();
+  Future<void> retrieveFromHistory(List<KitchenTicket> tickets) =>
+      _restoreFinished(tickets, markRetrieved: true);
+
+  Future<void> _restoreFinished(
+    List<KitchenTicket> tickets, {
+    required bool markRetrieved,
+  }) async {
+    final retrievedIds = tickets.map((ticket) => ticket.id).toSet();
     for (final ticket in tickets) {
       _completionDeadlines.remove(ticket.id);
       _locallyCompletedTicketIds.remove(ticket.id);
       _finishedHistoryTickets.remove(ticket.id);
     }
-    final restoredTickets = tickets
-        .where((ticket) => activeTicketIds.add(ticket.id))
-        .toList(growable: false);
-    if (restoredTickets.isNotEmpty) {
-      _tickets = [..._tickets, ...restoredTickets];
-    }
+    final activeTicketIds = _tickets.map((ticket) => ticket.id).toSet();
+    _tickets = [
+      for (final ticket in _tickets)
+        retrievedIds.contains(ticket.id)
+            ? ticket.copyWith(isRetrieved: markRetrieved || ticket.isRetrieved)
+            : ticket,
+      for (final ticket in tickets)
+        if (activeTicketIds.add(ticket.id))
+          ticket.copyWith(isRetrieved: markRetrieved || ticket.isRetrieved),
+    ];
     _filter = KitchenOrderFilter.all;
     final restoredPage = ticketGroups.indexWhere(
       (receipt) => receipt.any(
@@ -168,6 +188,7 @@ class KitchenBoardViewModel extends ChangeNotifier {
     notifyListeners();
     await _repository.restoreFinished(
       tickets.map((ticket) => ticket.id).toList(),
+      markRetrieved: markRetrieved,
     );
   }
 
@@ -175,6 +196,27 @@ class KitchenBoardViewModel extends ChangeNotifier {
   /// The order remains available in local order history.
   bool isCompletedLocally(List<KitchenTicket> tickets) =>
       tickets.any((ticket) => _locallyCompletedTicketIds.contains(ticket.id));
+
+  /// Whether this receipt was restored from local order history.
+  bool isRetrieved(List<KitchenTicket> tickets) =>
+      tickets.any((ticket) => ticket.isRetrieved);
+
+  /// Time from the order's first received timestamp until it was finished.
+  Duration? completionDurationFor(List<KitchenTicket> tickets) {
+    if (tickets.isEmpty) return null;
+    DateTime? finishedAt;
+    var startedAt = tickets.first.createdAt;
+    for (final ticket in tickets) {
+      if (ticket.createdAt.isBefore(startedAt)) startedAt = ticket.createdAt;
+      final ticketFinishedAt = ticket.finishedAt;
+      if (ticketFinishedAt != null &&
+          (finishedAt == null || ticketFinishedAt.isAfter(finishedAt))) {
+        finishedAt = ticketFinishedAt;
+      }
+    }
+    if (finishedAt == null || finishedAt.isBefore(startedAt)) return null;
+    return finishedAt.difference(startedAt);
+  }
 
   int completionSecondsRemaining(List<KitchenTicket> tickets) {
     final deadline = tickets
@@ -248,9 +290,11 @@ class KitchenBoardViewModel extends ChangeNotifier {
         settings.urgentSeconds >= 60;
     if (hasInvalidSeconds ||
         settings.warningThresholdSeconds <= 0 ||
-        settings.warningThresholdSeconds >= settings.urgentThresholdSeconds) {
+        settings.warningThresholdSeconds >= settings.urgentThresholdSeconds ||
+        settings.finishedReceiptSeconds < 1 ||
+        settings.finishedReceiptSeconds > 300) {
       throw const FormatException(
-        'Yellow timer must be above 00:00 and before the red timer.',
+        'Set valid order timers and a Finished receipt delay from 1 to 300 seconds.',
       );
     }
     await _settingsRepository.save(settings);
