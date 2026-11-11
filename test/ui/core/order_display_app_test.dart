@@ -105,6 +105,9 @@ class EmptyKitchenRepository implements KitchenRepository {
   Future<void> markFinished(List<String> ticketIds) async {}
 
   @override
+  Future<void> archiveCancelled(List<String> ticketIds) async {}
+
+  @override
   Future<void> restoreFinished(
     List<String> ticketIds, {
     required bool markRetrieved,

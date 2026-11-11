@@ -186,10 +186,13 @@ class _KitchenBoardBody extends StatelessWidget {
                         iconNameFor: viewModel.orderTypeIconNameFor,
                         settings: viewModel.settings,
                         isRetrieved: viewModel.isRetrieved,
+                        isCancelled: viewModel.isCancelled,
                         isCrossed: viewModel.isItemCrossed,
                         onToggle: viewModel.toggleItemCrossed,
                         completionSecondsRemaining:
                             viewModel.completionSecondsRemaining,
+                        cancellationSecondsRemaining:
+                            viewModel.cancellationSecondsRemaining,
                         onComplete: viewModel.completeLocally,
                         onUndoComplete: viewModel.undoLocalCompletion,
                       ),
@@ -488,9 +491,11 @@ class _TicketPager extends StatefulWidget {
     required this.iconNameFor,
     required this.settings,
     required this.isRetrieved,
+    required this.isCancelled,
     required this.isCrossed,
     required this.onToggle,
     required this.completionSecondsRemaining,
+    required this.cancellationSecondsRemaining,
     required this.onComplete,
     required this.onUndoComplete,
   });
@@ -500,9 +505,11 @@ class _TicketPager extends StatefulWidget {
   final String Function(KitchenTicket) iconNameFor;
   final KdsSettings settings;
   final bool Function(List<KitchenTicket>) isRetrieved;
+  final bool Function(List<KitchenTicket>) isCancelled;
   final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
   final void Function(KitchenTicket ticket, int itemIndex) onToggle;
   final int Function(List<KitchenTicket>) completionSecondsRemaining;
+  final int Function(List<KitchenTicket>) cancellationSecondsRemaining;
   final Future<void> Function(List<KitchenTicket>) onComplete;
   final Future<void> Function(List<KitchenTicket>) onUndoComplete;
 
@@ -571,9 +578,11 @@ class _TicketPagerState extends State<_TicketPager> {
         iconNameFor: widget.iconNameFor,
         settings: widget.settings,
         isRetrieved: widget.isRetrieved,
+        isCancelled: widget.isCancelled,
         isCrossed: widget.isCrossed,
         onToggle: widget.onToggle,
         completionSecondsRemaining: widget.completionSecondsRemaining,
+        cancellationSecondsRemaining: widget.cancellationSecondsRemaining,
         onComplete: widget.onComplete,
         onUndoComplete: widget.onUndoComplete,
       ),
@@ -587,9 +596,11 @@ class _TicketGrid extends StatelessWidget {
     required this.iconNameFor,
     required this.settings,
     required this.isRetrieved,
+    required this.isCancelled,
     required this.isCrossed,
     required this.onToggle,
     required this.completionSecondsRemaining,
+    required this.cancellationSecondsRemaining,
     required this.onComplete,
     required this.onUndoComplete,
   });
@@ -597,9 +608,11 @@ class _TicketGrid extends StatelessWidget {
   final String Function(KitchenTicket) iconNameFor;
   final KdsSettings settings;
   final bool Function(List<KitchenTicket>) isRetrieved;
+  final bool Function(List<KitchenTicket>) isCancelled;
   final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
   final void Function(KitchenTicket ticket, int itemIndex) onToggle;
   final int Function(List<KitchenTicket>) completionSecondsRemaining;
+  final int Function(List<KitchenTicket>) cancellationSecondsRemaining;
   final Future<void> Function(List<KitchenTicket>) onComplete;
   final Future<void> Function(List<KitchenTicket>) onUndoComplete;
   @override
@@ -633,9 +646,13 @@ class _TicketGrid extends StatelessWidget {
           iconName: iconNameFor(groups[index].first),
           settings: settings,
           isRetrieved: isRetrieved(groups[index]),
+          isCancelled: isCancelled(groups[index]),
           isCrossed: isCrossed,
           onToggle: onToggle,
           secondsRemaining: completionSecondsRemaining(groups[index]),
+          cancellationSecondsRemaining: cancellationSecondsRemaining(
+            groups[index],
+          ),
           onComplete: () => onComplete(groups[index]),
           onUndoComplete: () => onUndoComplete(groups[index]),
         ),
@@ -650,9 +667,11 @@ class _TicketCard extends StatelessWidget {
     required this.iconName,
     required this.settings,
     required this.isRetrieved,
+    required this.isCancelled,
     required this.isCrossed,
     required this.onToggle,
     required this.secondsRemaining,
+    required this.cancellationSecondsRemaining,
     required this.onComplete,
     required this.onUndoComplete,
   });
@@ -660,9 +679,11 @@ class _TicketCard extends StatelessWidget {
   final String iconName;
   final KdsSettings settings;
   final bool isRetrieved;
+  final bool isCancelled;
   final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
   final void Function(KitchenTicket ticket, int itemIndex) onToggle;
   final int secondsRemaining;
+  final int cancellationSecondsRemaining;
   final Future<void> Function() onComplete;
   final Future<void> Function() onUndoComplete;
   @override
@@ -688,26 +709,62 @@ class _TicketCard extends StatelessWidget {
               fit: StackFit.expand,
               children: [
                 const ColoredBox(color: Colors.black),
-                ClipPath(
-                  clipper: const SlantedTimerClipper(),
-                  child: ColoredBox(color: accent),
-                ),
-                if (secondsRemaining > 0)
-                  const ColoredBox(color: Color(0xFF007C58)),
+                if (isCancelled)
+                  const ColoredBox(color: Color(0xFFB42339))
+                else ...[
+                  ClipPath(
+                    clipper: const SlantedTimerClipper(),
+                    child: ColoredBox(color: accent),
+                  ),
+                  if (secondsRemaining > 0)
+                    const ColoredBox(color: Color(0xFF007C58)),
+                ],
                 Semantics(
-                  button: secondsRemaining == 0,
-                  label: secondsRemaining > 0
+                  button: !isCancelled && secondsRemaining == 0,
+                  label: isCancelled
+                      ? cancellationSecondsRemaining > 0
+                            ? 'Cancelled. Moving to order history in '
+                                  '$cancellationSecondsRemaining seconds.'
+                            : 'Cancelled. Moving to order history.'
+                      : secondsRemaining > 0
                       ? 'Finished. Removing in $secondsRemaining seconds.'
                       : 'Tap receipt header to mark this order finished.',
                   child: InkWell(
-                    onTap: secondsRemaining == 0
+                    onTap: !isCancelled && secondsRemaining == 0
                         ? () {
                             onComplete();
                           }
                         : null,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 14),
-                      child: secondsRemaining > 0
+                      child: isCancelled
+                          ? Row(
+                              children: [
+                                const Expanded(
+                                  child: Text(
+                                    'CANCELLED',
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                ),
+                                if (cancellationSecondsRemaining > 0)
+                                  Text(
+                                    '00:${cancellationSecondsRemaining.toString().padLeft(2, '0')}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                              ],
+                            )
+                          : secondsRemaining > 0
                           ? Row(
                               children: [
                                 const Expanded(
@@ -889,6 +946,7 @@ class _TicketCard extends StatelessWidget {
                     largeText: settings.largeText,
                     isCrossed: isCrossed,
                     onToggle: onToggle,
+                    enabled: !isCancelled && secondsRemaining == 0,
                   ),
                 ],
               ),
@@ -920,11 +978,13 @@ class _Items extends StatelessWidget {
     required this.largeText,
     required this.isCrossed,
     required this.onToggle,
+    required this.enabled,
   });
   final List<KitchenTicket> tickets;
   final bool largeText;
   final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
   final void Function(KitchenTicket ticket, int itemIndex) onToggle;
+  final bool enabled;
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -940,13 +1000,15 @@ class _Items extends StatelessWidget {
               final item = ticket.items[itemIndex];
               final crossed = isCrossed(ticket, itemIndex);
               return Semantics(
-                button: true,
-                label: crossed
+                button: enabled,
+                label: !enabled
+                    ? '${item.name}, cancelled.'
+                    : crossed
                     ? '${item.name}, completed. Tap to restore.'
                     : '${item.name}. Tap to cross out.',
                 child: InkWell(
                   borderRadius: BorderRadius.circular(4),
-                  onTap: () => onToggle(ticket, itemIndex),
+                  onTap: enabled ? () => onToggle(ticket, itemIndex) : null,
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 3),
                     child: Text(

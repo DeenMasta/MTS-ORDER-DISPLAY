@@ -108,15 +108,24 @@ class _KitchenHistoryScreenState extends State<KitchenHistoryScreen> {
                               const SizedBox(height: 10),
                           itemBuilder: (context, index) {
                             final tickets = groups[index];
+                            final cancelled = widget.viewModel.isCancelled(
+                              tickets,
+                            );
                             return _HistoryReceipt(
                               tickets: tickets,
                               finished: widget.viewModel.isCompletedLocally(
                                 tickets,
                               ),
+                              cancelled: cancelled,
                               retrieved: widget.viewModel.isRetrieved(tickets),
-                              completionDuration: widget.viewModel
-                                  .completionDurationFor(tickets),
-                              onTap: () => _restoreToDashboard(tickets),
+                              completionDuration: cancelled
+                                  ? null
+                                  : widget.viewModel.completionDurationFor(
+                                      tickets,
+                                    ),
+                              onTap: cancelled
+                                  ? null
+                                  : () => _restoreToDashboard(tickets),
                             );
                           },
                         ),
@@ -161,6 +170,7 @@ class _HistoryReceipt extends StatelessWidget {
   const _HistoryReceipt({
     required this.tickets,
     required this.finished,
+    required this.cancelled,
     required this.retrieved,
     required this.completionDuration,
     required this.onTap,
@@ -168,9 +178,10 @@ class _HistoryReceipt extends StatelessWidget {
 
   final List<KitchenTicket> tickets;
   final bool finished;
+  final bool cancelled;
   final bool retrieved;
   final Duration? completionDuration;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -198,11 +209,14 @@ class _HistoryReceipt extends StatelessWidget {
                     fontSize: 18,
                   ),
                 ),
-                if (finished) ...[
+                if (cancelled) ...[
+                  const SizedBox(width: 8),
+                  const _CancelledBadge(),
+                ] else if (finished) ...[
                   const SizedBox(width: 8),
                   const _FinishedBadge(),
                 ],
-                if (retrieved) ...[
+                if (!cancelled && retrieved) ...[
                   const SizedBox(width: 6),
                   const _RetrievedBadge(),
                 ],
@@ -292,6 +306,28 @@ class _FinishedBadge extends StatelessWidget {
     ),
     child: const Text(
       'FINISHED',
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: 9,
+        fontWeight: FontWeight.w900,
+        letterSpacing: .5,
+      ),
+    ),
+  );
+}
+
+class _CancelledBadge extends StatelessWidget {
+  const _CancelledBadge();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    decoration: BoxDecoration(
+      color: const Color(0xFFB42339),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    child: const Text(
+      'CANCELLED',
       style: TextStyle(
         color: Colors.white,
         fontSize: 9,

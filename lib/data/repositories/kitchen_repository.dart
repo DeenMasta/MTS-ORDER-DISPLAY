@@ -15,6 +15,7 @@ abstract interface class KitchenRepository {
 
   Future<List<KitchenTicket>> dismiss(String ticketId);
   Future<void> markFinished(List<String> ticketIds);
+  Future<void> archiveCancelled(List<String> ticketIds);
 
   /// Returns local Finished receipts to the dashboard.
   ///
@@ -86,6 +87,12 @@ class StoredKitchenRepository implements KitchenRepository {
   @override
   Future<void> markFinished(List<String> ticketIds) =>
       _store.markFinished(ticketIds);
+
+  @override
+  Future<void> archiveCancelled(List<String> ticketIds) async {
+    await _store.archiveCancelled(ticketIds);
+    _changes.add(null);
+  }
 
   @override
   Future<void> restoreFinished(

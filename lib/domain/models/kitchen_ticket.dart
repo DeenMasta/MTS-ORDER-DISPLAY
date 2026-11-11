@@ -63,7 +63,9 @@ class KitchenTicket {
     this.orderFor,
     this.enteredAt,
     this.finishedAt,
+    this.cancelledAt,
     this.isRetrieved = false,
+    this.isCancelled = false,
     this.orderTypes = const [],
   });
 
@@ -88,8 +90,14 @@ class KitchenTicket {
   /// Local timestamp recorded when this display marked the receipt Finished.
   final DateTime? finishedAt;
 
+  /// Local timestamp recorded when the POS cancelled or voided this receipt.
+  final DateTime? cancelledAt;
+
   /// Whether this locally finished receipt was retrieved back to live orders.
   final bool isRetrieved;
+
+  /// Whether the POS cancelled or voided this receipt.
+  final bool isCancelled;
   final List<KdsOrderType> orderTypes;
 
   String get id => '$saleId:$departmentId';
@@ -126,13 +134,13 @@ class KitchenTicket {
     final orderNumber = json['order_number'];
     final createdAt = DateTime.tryParse(value('created_at'));
     final items = json['items'];
-    final action = value('action');
+    final action = value('action').toLowerCase();
     if (revision is! int ||
         revision < 1 ||
         orderNumber is! int ||
         createdAt == null ||
         items is! List ||
-        !{'upsert', 'cancel'}.contains(action)) {
+        !{'upsert', 'cancel', 'void'}.contains(action)) {
       throw const FormatException('Invalid kitchen order.');
     }
     return KitchenTicket(
@@ -162,7 +170,9 @@ class KitchenTicket {
       orderFor: json['order_for'] as String?,
       enteredAt: DateTime.tryParse(json['entered_at'] as String? ?? ''),
       finishedAt: DateTime.tryParse(json['finished_at'] as String? ?? ''),
+      cancelledAt: DateTime.tryParse(json['cancelled_at'] as String? ?? ''),
       isRetrieved: json['is_retrieved'] == true,
+      isCancelled: json['is_cancelled'] == true,
       orderTypes: (json['order_types'] as List? ?? const [])
           .whereType<Map>()
           .map((type) => KdsOrderType.fromJson(Map<String, dynamic>.from(type)))
@@ -186,7 +196,9 @@ class KitchenTicket {
     'order_for': orderFor,
     'entered_at': enteredAt?.toIso8601String(),
     'finished_at': finishedAt?.toIso8601String(),
+    'cancelled_at': cancelledAt?.toIso8601String(),
     'is_retrieved': isRetrieved,
+    'is_cancelled': isCancelled,
     'order_types': orderTypes
         .map((type) => type.toJson())
         .toList(growable: false),
@@ -194,29 +206,35 @@ class KitchenTicket {
     'items': items.map((item) => item.toJson()).toList(growable: false),
   };
 
-  KitchenTicket copyWith({DateTime? finishedAt, bool? isRetrieved}) =>
-      KitchenTicket(
-        messageId: messageId,
-        saleId: saleId,
-        departmentId: departmentId,
-        revision: revision,
-        action: action,
-        orderNumber: orderNumber,
-        createdAt: createdAt,
-        items: items,
-        tableName: tableName,
-        orderName: orderName,
-        remarks: remarks,
-        orderTypeId: orderTypeId,
-        orderTypeName: orderTypeName,
-        staffName: staffName,
-        orderedBy: orderedBy,
-        orderFor: orderFor,
-        enteredAt: enteredAt,
-        finishedAt: finishedAt ?? this.finishedAt,
-        isRetrieved: isRetrieved ?? this.isRetrieved,
-        orderTypes: orderTypes,
-      );
+  KitchenTicket copyWith({
+    DateTime? finishedAt,
+    DateTime? cancelledAt,
+    bool? isRetrieved,
+    bool? isCancelled,
+  }) => KitchenTicket(
+    messageId: messageId,
+    saleId: saleId,
+    departmentId: departmentId,
+    revision: revision,
+    action: action,
+    orderNumber: orderNumber,
+    createdAt: createdAt,
+    items: items,
+    tableName: tableName,
+    orderName: orderName,
+    remarks: remarks,
+    orderTypeId: orderTypeId,
+    orderTypeName: orderTypeName,
+    staffName: staffName,
+    orderedBy: orderedBy,
+    orderFor: orderFor,
+    enteredAt: enteredAt,
+    finishedAt: finishedAt ?? this.finishedAt,
+    cancelledAt: cancelledAt ?? this.cancelledAt,
+    isRetrieved: isRetrieved ?? this.isRetrieved,
+    isCancelled: isCancelled ?? this.isCancelled,
+    orderTypes: orderTypes,
+  );
 }
 
 class KdsOrderType {

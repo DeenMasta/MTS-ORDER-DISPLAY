@@ -15,14 +15,15 @@ class TicketStore {
   Future<List<KitchenTicket>> activeTickets() async {
     final rows = await (await _db).database.query(
       'tickets',
-      where: 'status IN (?, ?)',
-      whereArgs: ['active', 'retrieved'],
+      where: 'status IN (?, ?, ?)',
+      whereArgs: ['active', 'retrieved', 'cancelling'],
       orderBy: 'updated_at ASC',
     );
     return rows.map(_ticketFromRow).toList(growable: false);
   }
 
-  /// Returns the receipts marked Finished on the supplied local calendar day.
+  /// Returns Finished and Cancelled receipts for the supplied local calendar
+  /// day.
   ///
   /// Old receipts remain in SQLite; the day range only controls what is shown
   /// in the KDS history view.
@@ -31,9 +32,10 @@ class TicketStore {
     final localEnd = localStart.add(const Duration(days: 1));
     final rows = await (await _db).database.query(
       'tickets',
-      where: 'status = ? AND updated_at >= ? AND updated_at < ?',
+      where: 'status IN (?, ?) AND updated_at >= ? AND updated_at < ?',
       whereArgs: [
         'dismissed',
+        'cancelled',
         localStart.toUtc().toIso8601String(),
         localEnd.toUtc().toIso8601String(),
       ],
@@ -81,12 +83,16 @@ class TicketStore {
           ticket.revision <= (existing.single['revision'] as int)) {
         return;
       }
+      final isCancellation =
+          ticket.action == 'cancel' || ticket.action == 'void';
       await transaction.insert('tickets', {
         'id': ticket.id,
         'revision': ticket.revision,
-        'status': ticket.action == 'cancel' ? 'cancelled' : 'active',
+        'status': isCancellation ? 'cancelling' : 'active',
         'payload_json': jsonEncode(ticket.toJson()),
-        'updated_at': ticket.createdAt.toUtc().toIso8601String(),
+        'updated_at': (isCancellation ? DateTime.now() : ticket.createdAt)
+            .toUtc()
+            .toIso8601String(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     });
   }
@@ -123,6 +129,10 @@ class TicketStore {
   Future<void> markFinished(Iterable<String> ticketIds) =>
       _setTicketStatus(ticketIds, status: 'dismissed');
 
+  /// Moves cancelled receipts from their brief dashboard notice into history.
+  Future<void> archiveCancelled(Iterable<String> ticketIds) =>
+      _setTicketStatus(ticketIds, status: 'cancelled');
+
   /// Restores a receipt to live orders.
   ///
   /// The retrieved status is reserved for the explicit Order History action.
@@ -143,8 +153,15 @@ class TicketStore {
     final payload = Map<String, dynamic>.from(
       jsonDecode(row['payload_json']! as String) as Map,
     );
-    if (row['status'] == 'retrieved') payload['is_retrieved'] = true;
-    if (includeFinishedAt) payload['finished_at'] = row['updated_at'];
+    final status = row['status'];
+    if (status == 'retrieved') payload['is_retrieved'] = true;
+    if (status == 'cancelling' || status == 'cancelled') {
+      payload['is_cancelled'] = true;
+      payload['cancelled_at'] = row['updated_at'];
+    }
+    if (includeFinishedAt && status == 'dismissed') {
+      payload['finished_at'] = row['updated_at'];
+    }
     return KitchenTicket.fromJson(payload);
   }
 

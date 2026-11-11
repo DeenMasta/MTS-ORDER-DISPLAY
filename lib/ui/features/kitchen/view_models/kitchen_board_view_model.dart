@@ -38,6 +38,7 @@ class KitchenBoardViewModel extends ChangeNotifier {
   KdsSettings _settings = const KdsSettings();
   final Set<String> _crossedItemKeys = <String>{};
   final Map<String, DateTime> _completionDeadlines = <String, DateTime>{};
+  final Map<String, DateTime> _cancellationDeadlines = <String, DateTime>{};
   final Set<String> _locallyCompletedTicketIds = <String>{};
   final Map<String, KitchenTicket> _finishedHistoryTickets =
       <String, KitchenTicket>{};
@@ -54,9 +55,8 @@ class KitchenBoardViewModel extends ChangeNotifier {
   int get receiptsPerPage => _receiptsPerPage;
   KdsSettings get settings => _settings;
 
-  /// The menu history contains only receipts marked Finished on this display.
-  /// Incoming orders remain stored in SQLite, but stay on the live dashboard
-  /// until someone finishes them.
+  /// The menu history contains locally Finished receipts and receipts cancelled
+  /// or voided by the POS.
   List<List<KitchenTicket>> get todayHistoryGroups {
     if (!_isSameCalendarDay(_historyDay, DateTime.now())) return const [];
     final groups = groupKitchenTicketsByOrder(_finishedHistoryTickets.values);
@@ -120,6 +120,7 @@ class KitchenBoardViewModel extends ChangeNotifier {
       _crossedItemKeys.contains(_itemKey(ticket, itemIndex));
 
   void toggleItemCrossed(KitchenTicket ticket, int itemIndex) {
+    if (ticket.isCancelled) return;
     final key = _itemKey(ticket, itemIndex);
     if (!_crossedItemKeys.add(key)) _crossedItemKeys.remove(key);
     final receipt = _receiptFor(ticket);
@@ -130,7 +131,11 @@ class KitchenBoardViewModel extends ChangeNotifier {
   /// Marks a receipt as finished only on this display and saves that local
   /// state so completed receipts do not return after a restart.
   Future<void> completeLocally(List<KitchenTicket> tickets) async {
-    if (tickets.isEmpty || isCompletedLocally(tickets)) return;
+    if (tickets.isEmpty ||
+        isCompletedLocally(tickets) ||
+        isCancelled(tickets)) {
+      return;
+    }
     final now = DateTime.now();
     final deadline = now.add(
       Duration(seconds: _settings.finishedReceiptSeconds),
@@ -155,8 +160,10 @@ class KitchenBoardViewModel extends ChangeNotifier {
   /// Retrieves a Finished receipt from Order History back to the dashboard.
   ///
   /// This changes only this display's local status; it never contacts POS.
-  Future<void> retrieveFromHistory(List<KitchenTicket> tickets) =>
-      _restoreFinished(tickets, markRetrieved: true);
+  Future<void> retrieveFromHistory(List<KitchenTicket> tickets) {
+    if (isCancelled(tickets)) return Future<void>.value();
+    return _restoreFinished(tickets, markRetrieved: true);
+  }
 
   Future<void> _restoreFinished(
     List<KitchenTicket> tickets, {
@@ -201,6 +208,10 @@ class KitchenBoardViewModel extends ChangeNotifier {
   bool isRetrieved(List<KitchenTicket> tickets) =>
       tickets.any((ticket) => ticket.isRetrieved);
 
+  /// Whether the POS cancelled or voided this receipt.
+  bool isCancelled(List<KitchenTicket> tickets) =>
+      tickets.any((ticket) => ticket.isCancelled);
+
   /// Time from the order's first received timestamp until it was finished.
   Duration? completionDurationFor(List<KitchenTicket> tickets) {
     if (tickets.isEmpty) return null;
@@ -231,6 +242,20 @@ class KitchenBoardViewModel extends ChangeNotifier {
     return milliseconds <= 0 ? 0 : (milliseconds / 1000).ceil();
   }
 
+  /// Seconds the POS cancellation notice remains visible on the dashboard.
+  int cancellationSecondsRemaining(List<KitchenTicket> tickets) {
+    final deadline = tickets
+        .map((ticket) => _cancellationDeadlines[ticket.id])
+        .whereType<DateTime>()
+        .fold<DateTime?>(null, (earliest, value) {
+          if (earliest == null || value.isBefore(earliest)) return value;
+          return earliest;
+        });
+    if (deadline == null) return 0;
+    final milliseconds = deadline.difference(DateTime.now()).inMilliseconds;
+    return milliseconds <= 0 ? 0 : (milliseconds / 1000).ceil();
+  }
+
   Future<void> testNewOrderSound({KdsAlertTone? tone}) =>
       _alertPlayer.play(tone ?? _settings.newOrderTone);
 
@@ -250,6 +275,7 @@ class KitchenBoardViewModel extends ChangeNotifier {
     });
     _clock ??= Timer.periodic(const Duration(seconds: 1), (_) {
       _removeExpiredCompletions();
+      _removeExpiredCancellations();
       _clearHistoryForNewDay();
       _checkUrgentOrderAlerts();
       notifyListeners();
@@ -315,7 +341,11 @@ class KitchenBoardViewModel extends ChangeNotifier {
       final tickets = await _repository.historyForDay(now);
       for (final ticket in tickets) {
         _finishedHistoryTickets[ticket.id] = ticket;
-        _locallyCompletedTicketIds.add(ticket.id);
+        if (ticket.isCancelled) {
+          _locallyCompletedTicketIds.remove(ticket.id);
+        } else {
+          _locallyCompletedTicketIds.add(ticket.id);
+        }
       }
     } on Object {
       // A history read failure must not prevent live orders from rendering.
@@ -403,6 +433,7 @@ class KitchenBoardViewModel extends ChangeNotifier {
       final previousIds = _tickets.map((ticket) => ticket.id).toSet();
       final updatedTickets = await _repository.start(session);
       _tickets = updatedTickets;
+      _prepareCancelledTicketsForDisplay();
       await _loadOrderTypes();
       _discardCrossedItemsForReplacedTickets();
       final hasNewOrders = updatedTickets.any(
@@ -461,6 +492,9 @@ class KitchenBoardViewModel extends ChangeNotifier {
     _completionDeadlines.removeWhere(
       (ticketId, _) => !activeTicketIds.contains(ticketId),
     );
+    _cancellationDeadlines.removeWhere(
+      (ticketId, _) => !activeTicketIds.contains(ticketId),
+    );
     for (final ticket in _tickets) {
       final finishedTicket = _finishedHistoryTickets[ticket.id];
       if (finishedTicket != null && ticket.revision > finishedTicket.revision) {
@@ -469,6 +503,34 @@ class KitchenBoardViewModel extends ChangeNotifier {
         _finishedHistoryTickets.remove(ticket.id);
       }
     }
+  }
+
+  void _prepareCancelledTicketsForDisplay() {
+    final now = DateTime.now();
+    final cancelledTickets = _tickets
+        .where((ticket) => ticket.isCancelled)
+        .toList(growable: false);
+    final cancelledIds = cancelledTickets.map((ticket) => ticket.id).toSet();
+    _cancellationDeadlines.removeWhere(
+      (ticketId, _) => !cancelledIds.contains(ticketId),
+    );
+
+    final expired = <KitchenTicket>[];
+    for (final ticket in cancelledTickets) {
+      _completionDeadlines.remove(ticket.id);
+      _locallyCompletedTicketIds.remove(ticket.id);
+      _finishedHistoryTickets.remove(ticket.id);
+      final cancelledAt = ticket.cancelledAt ?? now;
+      final deadline = cancelledAt.add(
+        Duration(seconds: _settings.finishedReceiptSeconds),
+      );
+      if (deadline.isAfter(now)) {
+        _cancellationDeadlines[ticket.id] = deadline;
+      } else {
+        expired.add(ticket);
+      }
+    }
+    if (expired.isNotEmpty) unawaited(_archiveCancelled(expired));
   }
 
   bool _isFinishedLocally(KitchenTicket ticket) {
@@ -481,6 +543,57 @@ class KitchenBoardViewModel extends ChangeNotifier {
     (_, deadline) => !deadline.isAfter(DateTime.now()),
   );
 
+  void _removeExpiredCancellations() {
+    final now = DateTime.now();
+    final expiredIds = _cancellationDeadlines.entries
+        .where((entry) => !entry.value.isAfter(now))
+        .map((entry) => entry.key)
+        .toSet();
+    if (expiredIds.isEmpty) return;
+    _cancellationDeadlines.removeWhere(
+      (ticketId, _) => expiredIds.contains(ticketId),
+    );
+    final expiredTickets = _tickets
+        .where((ticket) => expiredIds.contains(ticket.id))
+        .toList(growable: false);
+    if (expiredTickets.isNotEmpty) {
+      unawaited(_archiveCancelled(expiredTickets));
+    }
+  }
+
+  Future<void> _archiveCancelled(List<KitchenTicket> tickets) async {
+    final ids = tickets.map((ticket) => ticket.id).toSet();
+    if (ids.isEmpty) return;
+    final now = DateTime.now();
+    _historyDay = DateTime(now.year, now.month, now.day);
+    for (final ticket in tickets) {
+      _cancellationDeadlines.remove(ticket.id);
+      _completionDeadlines.remove(ticket.id);
+      _locallyCompletedTicketIds.remove(ticket.id);
+      _finishedHistoryTickets[ticket.id] = ticket.copyWith(
+        cancelledAt: ticket.cancelledAt ?? now,
+        isCancelled: true,
+      );
+    }
+    _tickets = _tickets
+        .where((ticket) => !ids.contains(ticket.id))
+        .toList(growable: false);
+    if (_page >= pageCount) _page = pageCount - 1;
+    notifyListeners();
+    try {
+      await _repository.archiveCancelled(ids.toList(growable: false));
+    } on Object {
+      // Keep the cancellation visible and retry on the next countdown tick.
+      final retryDeadline = DateTime.now().add(const Duration(seconds: 1));
+      _tickets = [..._tickets, ...tickets];
+      for (final ticket in tickets) {
+        _cancellationDeadlines[ticket.id] = retryDeadline;
+        _finishedHistoryTickets.remove(ticket.id);
+      }
+      notifyListeners();
+    }
+  }
+
   /// Sounds once when an active receipt first crosses the urgent threshold.
   /// Existing urgent receipts are marked as seen on app start and settings save
   /// so reconnects and redraws never trigger a burst of alerts.
@@ -490,6 +603,7 @@ class KitchenBoardViewModel extends ChangeNotifier {
         .where(
           (ticket) =>
               !_isFinishedLocally(ticket) &&
+              !ticket.isCancelled &&
               now.difference(ticket.createdAt.toLocal()).inSeconds >=
                   _settings.urgentThresholdSeconds,
         )

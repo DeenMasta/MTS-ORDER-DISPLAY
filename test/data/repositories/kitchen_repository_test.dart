@@ -65,7 +65,7 @@ void main() {
     expect(connection.receipts, hasLength(2));
   });
 
-  test('removes a card when a cancellation is stored', () async {
+  test('keeps a cancellation notice until the board archives it', () async {
     final pairing = FakePairingRepository(isPaired: true);
     final connection = FakePosConnection();
     final store = FakeTicketStore();
@@ -78,7 +78,24 @@ void main() {
     );
     await _settle();
 
-    expect(store.active, isEmpty);
+    expect(store.active, hasLength(1));
+    expect(store.active.single.isCancelled, isTrue);
+    expect(connection.receipts, hasLength(2));
+  });
+
+  test('accepts a void event as a cancellation notice', () async {
+    final pairing = FakePairingRepository(isPaired: true);
+    final connection = FakePosConnection();
+    final store = FakeTicketStore();
+    final repository = _repository(connection, pairing, store);
+    await repository.start(session);
+
+    connection.receive(order());
+    connection.receive(order(messageId: 'void-1', revision: 2, action: 'void'));
+    await _settle();
+
+    expect(store.active, hasLength(1));
+    expect(store.active.single.isCancelled, isTrue);
     expect(connection.receipts, hasLength(2));
   });
 
@@ -241,8 +258,11 @@ class FakeTicketStore extends TicketStore {
     if (!_processed.add(ticket.messageId)) return;
     final existing = _cards[ticket.id];
     if (existing != null && ticket.revision <= existing.revision) return;
-    if (ticket.action == 'cancel') {
-      _cards.remove(ticket.id);
+    if (ticket.action == 'cancel' || ticket.action == 'void') {
+      _cards[ticket.id] = ticket.copyWith(
+        cancelledAt: DateTime.now(),
+        isCancelled: true,
+      );
       return;
     }
     _cards[ticket.id] = ticket;

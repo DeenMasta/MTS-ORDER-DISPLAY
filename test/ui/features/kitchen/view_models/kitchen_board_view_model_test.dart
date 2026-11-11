@@ -488,6 +488,35 @@ void main() {
     expect(repository.historyCalls, 1);
     expect(viewModel.todayHistoryGroups, hasLength(1));
   });
+
+  test('archives a POS-cancelled receipt as Cancelled history', () async {
+    final cancelled = _ticket('201', 'Dine In').copyWith(
+      cancelledAt: DateTime.now().subtract(const Duration(seconds: 2)),
+      isCancelled: true,
+    );
+    final repository = _FakeKitchenRepository([cancelled]);
+    final viewModel = KitchenBoardViewModel(
+      repository: repository,
+      settingsRepository: _FakeSettingsRepository()
+        ..value = const KdsSettings(finishedReceiptSeconds: 1),
+    );
+    addTearDown(viewModel.dispose);
+
+    await viewModel.start(_session);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(viewModel.ticketGroups, isEmpty);
+    expect(viewModel.todayHistoryGroups, hasLength(1));
+    expect(viewModel.isCancelled(viewModel.todayHistoryGroups.single), isTrue);
+    expect(
+      viewModel.isCompletedLocally(viewModel.todayHistoryGroups.single),
+      isFalse,
+    );
+    expect(repository.archiveCancelledCalls, 1);
+
+    await viewModel.retrieveFromHistory(viewModel.todayHistoryGroups.single);
+    expect(viewModel.ticketGroups, isEmpty);
+  });
 }
 
 class _FakeSettingsRepository implements DisplaySettingsRepository {
@@ -528,9 +557,11 @@ class _FakeKitchenRepository implements KitchenRepository {
   final List<KitchenTicket> finishedHistory;
   final List<KdsOrderType> _configuredOrderTypes;
   final Set<String> _finishedTicketIds = <String>{};
+  final List<KitchenTicket> _cancelledHistory = <KitchenTicket>[];
   final _changes = StreamController<void>.broadcast();
   int dismissCalls = 0;
   int finishCalls = 0;
+  int archiveCancelledCalls = 0;
   int restoreCalls = 0;
   final List<bool> restoreIndicators = <bool>[];
   int historyCalls = 0;
@@ -562,8 +593,19 @@ class _FakeKitchenRepository implements KitchenRepository {
     historyCalls++;
     return <KitchenTicket>{
       ...finishedHistory,
+      ..._cancelledHistory,
       ..._tickets.where((ticket) => _finishedTicketIds.contains(ticket.id)),
     }.toList(growable: false);
+  }
+
+  @override
+  Future<void> archiveCancelled(List<String> ticketIds) async {
+    archiveCancelledCalls++;
+    final ids = ticketIds.toSet();
+    _cancelledHistory.addAll(
+      _tickets.where((ticket) => ids.contains(ticket.id)),
+    );
+    _tickets.removeWhere((ticket) => ids.contains(ticket.id));
   }
 
   @override

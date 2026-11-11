@@ -238,6 +238,9 @@ class _EmptyKitchenRepository implements KitchenRepository {
   Future<List<KitchenTicket>> historyForDay(DateTime day) async => const [];
 
   @override
+  Future<void> archiveCancelled(List<String> ticketIds) async {}
+
+  @override
   Future<void> markFinished(List<String> ticketIds) async {}
 
   @override
