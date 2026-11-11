@@ -62,6 +62,23 @@ void main() {
     expect(viewModel.visibleTicketGroups.single.first.orderNumber, '5');
   });
 
+  test('updates pairing state when the POS disconnects', () async {
+    final repository = _FakeKitchenRepository(const []);
+    final viewModel = KitchenBoardViewModel(
+      repository: repository,
+      settingsRepository: _FakeSettingsRepository(),
+    );
+    addTearDown(viewModel.dispose);
+
+    await viewModel.start(_session);
+    expect(viewModel.isPaired, isTrue);
+
+    repository.setPairingState(const PairingConnectionState(isPaired: false));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(viewModel.isPaired, isFalse);
+  });
+
   test('shows every active order type as a dashboard filter', () async {
     final viewModel = KitchenBoardViewModel(
       repository: _FakeKitchenRepository([
@@ -559,6 +576,10 @@ class _FakeKitchenRepository implements KitchenRepository {
   final Set<String> _finishedTicketIds = <String>{};
   final List<KitchenTicket> _cancelledHistory = <KitchenTicket>[];
   final _changes = StreamController<void>.broadcast();
+  final _pairingStates = StreamController<PairingConnectionState>.broadcast();
+  PairingConnectionState _pairingState = const PairingConnectionState(
+    isPaired: true,
+  );
   int dismissCalls = 0;
   int finishCalls = 0;
   int archiveCancelledCalls = 0;
@@ -570,15 +591,19 @@ class _FakeKitchenRepository implements KitchenRepository {
 
   void notifyChanged() => _changes.add(null);
 
+  void setPairingState(PairingConnectionState state) {
+    _pairingState = state;
+    _pairingStates.add(state);
+  }
+
   @override
   Stream<void> get changes => _changes.stream;
 
   @override
-  PairingConnectionState get pairingState =>
-      const PairingConnectionState(isPaired: true);
+  PairingConnectionState get pairingState => _pairingState;
 
   @override
-  Stream<PairingConnectionState> get pairingStates => const Stream.empty();
+  Stream<PairingConnectionState> get pairingStates => _pairingStates.stream;
 
   @override
   Future<List<KitchenTicket>> dismiss(String ticketId) async {

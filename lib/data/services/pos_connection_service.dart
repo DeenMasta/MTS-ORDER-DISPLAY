@@ -56,17 +56,24 @@ class PosConnectionService implements PosConnection {
           // Ignore malformed messages from the LAN peer.
         }
       },
-      onError: _messages.addError,
-      onDone: () {
-        if (identical(_channel, channel)) {
-          _channel = null;
-          _endpoint = null;
-          _disconnections.add(null);
-          _scheduleReconnect(endpoint);
-        }
+      onError: (Object error, StackTrace stackTrace) {
+        _messages.addError(error, stackTrace);
+        _handleConnectionEnded(channel, endpoint);
       },
+      onDone: () => _handleConnectionEnded(channel, endpoint),
     );
     _connections.add(null);
+  }
+
+  /// An unsuccessful socket reports an error before (and sometimes instead
+  /// of) its close event. Treat both cases as a disconnect so the UI can
+  /// immediately show its reconnecting indicator.
+  void _handleConnectionEnded(WebSocketChannel channel, Uri endpoint) {
+    if (!identical(_channel, channel)) return;
+    _channel = null;
+    _endpoint = null;
+    _disconnections.add(null);
+    _scheduleReconnect(endpoint);
   }
 
   void _scheduleReconnect(Uri endpoint) {

@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../domain/models/display_session.dart';
@@ -87,11 +88,28 @@ class _KitchenBoardScreenState extends State<KitchenBoardScreen> {
         SafeArea(
           child: ListenableBuilder(
             listenable: widget.viewModel,
-            builder: (context, _) => _KitchenBoardBody(
-              viewModel: widget.viewModel,
-              session: widget.session,
-              onChangeConnection: widget.onChangeConnection,
-              onOpenMenu: () => _scaffoldKey.currentState?.openEndDrawer(),
+            builder: (context, _) => Stack(
+              children: [
+                _KitchenBoardBody(
+                  viewModel: widget.viewModel,
+                  session: widget.session,
+                  onChangeConnection: widget.onChangeConnection,
+                  onOpenMenu: () => _scaffoldKey.currentState?.openEndDrawer(),
+                ),
+                if (!widget.viewModel.isPaired) ...[
+                  const Positioned.fill(
+                    child: ModalBarrier(
+                      dismissible: false,
+                      color: Color(0x660D0610),
+                    ),
+                  ),
+                  Center(
+                    child: _ReconnectDialog(
+                      pairingCode: widget.viewModel.pairingCode,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ),
@@ -157,10 +175,6 @@ class _KitchenBoardBody extends StatelessWidget {
                 orderCount: viewModel.ticketGroups.length,
                 onOpenMenu: onOpenMenu,
               ),
-              if (!viewModel.isPaired) ...[
-                SizedBox(height: compact ? 8 : 12),
-                _ConnectionStatus(code: viewModel.pairingCode),
-              ],
               SizedBox(height: compact ? 8 : 10),
               Align(
                 alignment: Alignment.centerLeft,
@@ -183,6 +197,7 @@ class _KitchenBoardBody extends StatelessWidget {
                         ),
                         viewModel: viewModel,
                         groups: viewModel.ticketGroups,
+                        clockTicks: viewModel.clockTicks,
                         iconNameFor: viewModel.orderTypeIconNameFor,
                         settings: viewModel.settings,
                         isRetrieved: viewModel.isRetrieved,
@@ -207,40 +222,82 @@ class _KitchenBoardBody extends StatelessWidget {
   }
 }
 
-class _ConnectionStatus extends StatelessWidget {
-  const _ConnectionStatus({required this.code});
+class _ReconnectDialog extends StatelessWidget {
+  const _ReconnectDialog({this.pairingCode});
 
-  final String? code;
+  final String? pairingCode;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-    decoration: BoxDecoration(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: AppColors.outline),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const SizedBox(
-          width: 14,
-          height: 14,
-          child: CircularProgressIndicator(strokeWidth: 2),
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: const BoxConstraints(maxWidth: 390),
+    child: Card(
+      color: AppColors.surfaceRaised,
+      elevation: 12,
+      shadowColor: const Color(0x660D0610),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: const BorderSide(color: AppColors.outline),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(28, 26, 28, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 34,
+              height: 34,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Reconnecting to POS',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.text,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              pairingCode == null
+                  ? 'Trying to restore the secure POS connection.'
+                  : 'Confirm this code in the POS to continue:',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.mutedText,
+                fontSize: 14,
+                height: 1.35,
+              ),
+            ),
+            if (pairingCode case final code?) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primarySoft,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  code,
+                  style: const TextStyle(
+                    color: AppColors.primaryDark,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
-        const SizedBox(width: 10),
-        Flexible(
-          child: Text(
-            code == null
-                ? 'Reconnecting to POS…'
-                : 'Confirm this code in POS: $code',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: _boardForeground, fontSize: 16),
-          ),
-        ),
-      ],
+      ),
     ),
   );
 }
@@ -488,6 +545,7 @@ class _TicketPager extends StatefulWidget {
     super.key,
     required this.viewModel,
     required this.groups,
+    required this.clockTicks,
     required this.iconNameFor,
     required this.settings,
     required this.isRetrieved,
@@ -502,6 +560,7 @@ class _TicketPager extends StatefulWidget {
 
   final KitchenBoardViewModel viewModel;
   final List<List<KitchenTicket>> groups;
+  final ValueListenable<int> clockTicks;
   final String Function(KitchenTicket) iconNameFor;
   final KdsSettings settings;
   final bool Function(List<KitchenTicket>) isRetrieved;
@@ -575,6 +634,7 @@ class _TicketPagerState extends State<_TicketPager> {
             .skip(page * widget.viewModel.receiptsPerPage)
             .take(widget.viewModel.receiptsPerPage)
             .toList(growable: false),
+        clockTicks: widget.clockTicks,
         iconNameFor: widget.iconNameFor,
         settings: widget.settings,
         isRetrieved: widget.isRetrieved,
@@ -593,6 +653,7 @@ class _TicketPagerState extends State<_TicketPager> {
 class _TicketGrid extends StatelessWidget {
   const _TicketGrid({
     required this.groups,
+    required this.clockTicks,
     required this.iconNameFor,
     required this.settings,
     required this.isRetrieved,
@@ -605,6 +666,7 @@ class _TicketGrid extends StatelessWidget {
     required this.onUndoComplete,
   });
   final List<List<KitchenTicket>> groups;
+  final ValueListenable<int> clockTicks;
   final String Function(KitchenTicket) iconNameFor;
   final KdsSettings settings;
   final bool Function(List<KitchenTicket>) isRetrieved;
@@ -643,16 +705,16 @@ class _TicketGrid extends StatelessWidget {
         physics: const NeverScrollableScrollPhysics(),
         itemBuilder: (context, index) => _TicketCard(
           tickets: groups[index],
+          clockTicks: clockTicks,
           iconName: iconNameFor(groups[index].first),
           settings: settings,
           isRetrieved: isRetrieved(groups[index]),
           isCancelled: isCancelled(groups[index]),
           isCrossed: isCrossed,
           onToggle: onToggle,
-          secondsRemaining: completionSecondsRemaining(groups[index]),
-          cancellationSecondsRemaining: cancellationSecondsRemaining(
-            groups[index],
-          ),
+          secondsRemaining: () => completionSecondsRemaining(groups[index]),
+          cancellationSecondsRemaining: () =>
+              cancellationSecondsRemaining(groups[index]),
           onComplete: () => onComplete(groups[index]),
           onUndoComplete: () => onUndoComplete(groups[index]),
         ),
@@ -664,6 +726,7 @@ class _TicketGrid extends StatelessWidget {
 class _TicketCard extends StatelessWidget {
   const _TicketCard({
     required this.tickets,
+    required this.clockTicks,
     required this.iconName,
     required this.settings,
     required this.isRetrieved,
@@ -676,14 +739,15 @@ class _TicketCard extends StatelessWidget {
     required this.onUndoComplete,
   });
   final List<KitchenTicket> tickets;
+  final ValueListenable<int> clockTicks;
   final String iconName;
   final KdsSettings settings;
   final bool isRetrieved;
   final bool isCancelled;
   final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
   final void Function(KitchenTicket ticket, int itemIndex) onToggle;
-  final int secondsRemaining;
-  final int cancellationSecondsRemaining;
+  final int Function() secondsRemaining;
+  final int Function() cancellationSecondsRemaining;
   final Future<void> Function() onComplete;
   final Future<void> Function() onUndoComplete;
   @override
@@ -691,6 +755,8 @@ class _TicketCard extends StatelessWidget {
     final ticket = tickets.first;
     final orderer = ticket.displayOrderer;
     final orderFor = ticket.orderFor;
+    final remainingSeconds = secondsRemaining();
+    final cancelledRemainingSeconds = cancellationSecondsRemaining();
     final elapsed = DateTime.now().difference(ticket.createdAt.toLocal());
     final accent = elapsed.inSeconds >= settings.urgentThresholdSeconds
         ? const Color(0xFFFF1C2C)
@@ -716,21 +782,21 @@ class _TicketCard extends StatelessWidget {
                     clipper: const SlantedTimerClipper(),
                     child: ColoredBox(color: accent),
                   ),
-                  if (secondsRemaining > 0)
+                  if (remainingSeconds > 0)
                     const ColoredBox(color: Color(0xFF007C58)),
                 ],
                 Semantics(
-                  button: !isCancelled && secondsRemaining == 0,
+                  button: !isCancelled && remainingSeconds == 0,
                   label: isCancelled
-                      ? cancellationSecondsRemaining > 0
+                      ? cancelledRemainingSeconds > 0
                             ? 'Cancelled. Moving to order history in '
-                                  '$cancellationSecondsRemaining seconds.'
+                                  '$cancelledRemainingSeconds seconds.'
                             : 'Cancelled. Moving to order history.'
-                      : secondsRemaining > 0
-                      ? 'Finished. Removing in $secondsRemaining seconds.'
+                      : remainingSeconds > 0
+                      ? 'Finished. Removing in $remainingSeconds seconds.'
                       : 'Tap receipt header to mark this order finished.',
                   child: InkWell(
-                    onTap: !isCancelled && secondsRemaining == 0
+                    onTap: !isCancelled && remainingSeconds == 0
                         ? () {
                             onComplete();
                           }
@@ -752,19 +818,22 @@ class _TicketCard extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                                if (cancellationSecondsRemaining > 0)
-                                  Text(
-                                    '00:${cancellationSecondsRemaining.toString().padLeft(2, '0')}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 1,
+                                if (cancelledRemainingSeconds > 0)
+                                  ValueListenableBuilder<int>(
+                                    valueListenable: clockTicks,
+                                    builder: (context, _, _) => Text(
+                                      '00:${cancellationSecondsRemaining().toString().padLeft(2, '0')}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 1,
+                                      ),
                                     ),
                                   ),
                               ],
                             )
-                          : secondsRemaining > 0
+                          : remainingSeconds > 0
                           ? Row(
                               children: [
                                 const Expanded(
@@ -779,13 +848,16 @@ class _TicketCard extends StatelessWidget {
                                     ),
                                   ),
                                 ),
-                                Text(
-                                  '00:${secondsRemaining.toString().padLeft(2, '0')}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 1,
+                                ValueListenableBuilder<int>(
+                                  valueListenable: clockTicks,
+                                  builder: (context, _, _) => Text(
+                                    '00:${secondsRemaining().toString().padLeft(2, '0')}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 1,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 2),
@@ -819,14 +891,21 @@ class _TicketCard extends StatelessWidget {
                                   ),
                                 ),
                                 const Spacer(),
-                                Text(
-                                  _formatDuration(elapsed),
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 1.2,
-                                  ),
+                                ValueListenableBuilder<int>(
+                                  valueListenable: clockTicks,
+                                  builder: (context, _, _) {
+                                    final currentElapsed = DateTime.now()
+                                        .difference(ticket.createdAt.toLocal());
+                                    return Text(
+                                      _formatDuration(currentElapsed),
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 1.2,
+                                      ),
+                                    );
+                                  },
                                 ),
                               ],
                             ),
@@ -946,7 +1025,7 @@ class _TicketCard extends StatelessWidget {
                     largeText: settings.largeText,
                     isCrossed: isCrossed,
                     onToggle: onToggle,
-                    enabled: !isCancelled && secondsRemaining == 0,
+                    enabled: !isCancelled && remainingSeconds == 0,
                   ),
                 ],
               ),

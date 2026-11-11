@@ -33,6 +33,7 @@ class KitchenBoardViewModel extends ChangeNotifier {
   int _page = 0;
   int _receiptsPerPage = 4;
   Timer? _clock;
+  final ValueNotifier<int> _clockTicks = ValueNotifier<int>(0);
   List<KdsOrderType> _orderTypes = const [];
   Map<String, String> _orderTypeIcons = const {};
   KdsSettings _settings = const KdsSettings();
@@ -54,6 +55,9 @@ class KitchenBoardViewModel extends ChangeNotifier {
   int get page => _page;
   int get receiptsPerPage => _receiptsPerPage;
   KdsSettings get settings => _settings;
+
+  /// Updates only time-sensitive receipt UI without rebuilding the board.
+  ValueListenable<int> get clockTicks => _clockTicks;
 
   /// The menu history contains locally Finished receipts and receipts cancelled
   /// or voided by the POS.
@@ -274,11 +278,12 @@ class KitchenBoardViewModel extends ChangeNotifier {
       notifyListeners();
     });
     _clock ??= Timer.periodic(const Duration(seconds: 1), (_) {
-      _removeExpiredCompletions();
+      final receiptsChanged = _removeExpiredCompletions();
       _removeExpiredCancellations();
       _clearHistoryForNewDay();
       _checkUrgentOrderAlerts();
-      notifyListeners();
+      _clockTicks.value++;
+      if (receiptsChanged) notifyListeners();
     });
     _settings = await _settingsRepository.load();
     await _reload(session);
@@ -539,9 +544,13 @@ class KitchenBoardViewModel extends ChangeNotifier {
     return deadline == null || !deadline.isAfter(DateTime.now());
   }
 
-  void _removeExpiredCompletions() => _completionDeadlines.removeWhere(
-    (_, deadline) => !deadline.isAfter(DateTime.now()),
-  );
+  bool _removeExpiredCompletions() {
+    final countBefore = _completionDeadlines.length;
+    _completionDeadlines.removeWhere(
+      (_, deadline) => !deadline.isAfter(DateTime.now()),
+    );
+    return _completionDeadlines.length != countBefore;
+  }
 
   void _removeExpiredCancellations() {
     final now = DateTime.now();
@@ -666,6 +675,7 @@ class KitchenBoardViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _clock?.cancel();
+    _clockTicks.dispose();
     _changes?.cancel();
     _pairingStates?.cancel();
     unawaited(_alertPlayer.dispose());
