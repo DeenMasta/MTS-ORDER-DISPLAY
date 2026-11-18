@@ -45,6 +45,8 @@ class KitchenBoardViewModel extends ChangeNotifier {
       <String, KitchenTicket>{};
   DateTime? _historyDay;
   final Set<String> _urgentTicketIds = <String>{};
+  final Map<String, TicketItemUpdates> _ticketItemUpdates =
+      <String, TicketItemUpdates>{};
 
   List<KitchenTicket> get tickets => _tickets;
   String? get error => _error;
@@ -58,6 +60,9 @@ class KitchenBoardViewModel extends ChangeNotifier {
 
   /// Updates only time-sensitive receipt UI without rebuilding the board.
   ValueListenable<int> get clockTicks => _clockTicks;
+
+  TicketItemUpdates? itemUpdatesFor(KitchenTicket ticket) =>
+      _ticketItemUpdates[ticket.id];
 
   /// The menu history contains locally Finished receipts and receipts cancelled
   /// or voided by the POS.
@@ -152,6 +157,23 @@ class KitchenBoardViewModel extends ChangeNotifier {
     }
     notifyListeners();
     await _repository.markFinished(tickets.map((ticket) => ticket.id).toList());
+  }
+
+  /// Starts the normal Finished countdown for a receipt already cancelled by
+  /// POS. The cancellation remains a local history record after the countdown.
+  Future<void> completeReceipt(List<KitchenTicket> tickets) {
+    if (!isCancelled(tickets)) return completeLocally(tickets);
+    if (tickets.isEmpty || cancellationSecondsRemaining(tickets) > 0) {
+      return Future<void>.value();
+    }
+    final deadline = DateTime.now().add(
+      Duration(seconds: _settings.finishedReceiptSeconds),
+    );
+    for (final ticket in tickets) {
+      _cancellationDeadlines[ticket.id] = deadline;
+    }
+    notifyListeners();
+    return Future<void>.value();
   }
 
   /// Cancels the Finished countdown from the live dashboard.
@@ -436,7 +458,11 @@ class KitchenBoardViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       final previousIds = _tickets.map((ticket) => ticket.id).toSet();
+      final previousTickets = <String, KitchenTicket>{
+        for (final ticket in _tickets) ticket.id: ticket,
+      };
       final updatedTickets = await _repository.start(session);
+      _recordItemUpdates(previousTickets, updatedTickets);
       _tickets = updatedTickets;
       _prepareCancelledTicketsForDisplay();
       await _loadOrderTypes();
@@ -494,6 +520,9 @@ class KitchenBoardViewModel extends ChangeNotifier {
     };
     _crossedItemKeys.removeWhere((key) => !activeKeys.contains(key));
     final activeTicketIds = _tickets.map((ticket) => ticket.id).toSet();
+    _ticketItemUpdates.removeWhere(
+      (ticketId, _) => !activeTicketIds.contains(ticketId),
+    );
     _completionDeadlines.removeWhere(
       (ticketId, _) => !activeTicketIds.contains(ticketId),
     );
@@ -510,8 +539,72 @@ class KitchenBoardViewModel extends ChangeNotifier {
     }
   }
 
+  void _recordItemUpdates(
+    Map<String, KitchenTicket> previousTickets,
+    List<KitchenTicket> updatedTickets,
+  ) {
+    for (final current in updatedTickets) {
+      final previous = previousTickets[current.id];
+      if (previous == null || _hasSameItems(previous, current)) continue;
+      final matchedPrevious = <int>{};
+      for (var index = 0; index < current.items.length; index++) {
+        final item = current.items[index];
+        var oldIndex = -1;
+        for (
+          var priorIndex = 0;
+          priorIndex < previous.items.length;
+          priorIndex++
+        ) {
+          if (!matchedPrevious.contains(priorIndex) &&
+              previous.items[priorIndex].name == item.name) {
+            oldIndex = priorIndex;
+            break;
+          }
+        }
+        if (oldIndex >= 0) {
+          matchedPrevious.add(oldIndex);
+        }
+      }
+      final removed = <String>[
+        for (var index = 0; index < previous.items.length; index++)
+          if (!matchedPrevious.contains(index))
+            '${previous.items[index].displayQuantity}x  ${previous.items[index].name}',
+      ];
+      if (removed.isNotEmpty) {
+        _ticketItemUpdates[current.id] = TicketItemUpdates(
+          removedItems: removed,
+        );
+      } else {
+        _ticketItemUpdates.remove(current.id);
+      }
+    }
+  }
+
+  bool _hasSameItems(KitchenTicket first, KitchenTicket second) {
+    if (first.items.length != second.items.length) return false;
+    for (var index = 0; index < first.items.length; index++) {
+      final previous = first.items[index];
+      final current = second.items[index];
+      if (previous.name != current.name ||
+          previous.quantity != current.quantity ||
+          previous.comments != current.comments ||
+          previous.variant != current.variant ||
+          previous.modifiers.length != current.modifiers.length ||
+          !_sameStrings(previous.modifiers, current.modifiers)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _sameStrings(List<String> first, List<String> second) {
+    for (var index = 0; index < first.length; index++) {
+      if (first[index] != second[index]) return false;
+    }
+    return true;
+  }
+
   void _prepareCancelledTicketsForDisplay() {
-    final now = DateTime.now();
     final cancelledTickets = _tickets
         .where((ticket) => ticket.isCancelled)
         .toList(growable: false);
@@ -520,22 +613,11 @@ class KitchenBoardViewModel extends ChangeNotifier {
       (ticketId, _) => !cancelledIds.contains(ticketId),
     );
 
-    final expired = <KitchenTicket>[];
     for (final ticket in cancelledTickets) {
       _completionDeadlines.remove(ticket.id);
       _locallyCompletedTicketIds.remove(ticket.id);
       _finishedHistoryTickets.remove(ticket.id);
-      final cancelledAt = ticket.cancelledAt ?? now;
-      final deadline = cancelledAt.add(
-        Duration(seconds: _settings.finishedReceiptSeconds),
-      );
-      if (deadline.isAfter(now)) {
-        _cancellationDeadlines[ticket.id] = deadline;
-      } else {
-        expired.add(ticket);
-      }
     }
-    if (expired.isNotEmpty) unawaited(_archiveCancelled(expired));
   }
 
   bool _isFinishedLocally(KitchenTicket ticket) {
@@ -681,6 +763,13 @@ class KitchenBoardViewModel extends ChangeNotifier {
     unawaited(_alertPlayer.dispose());
     super.dispose();
   }
+}
+
+class TicketItemUpdates {
+  TicketItemUpdates({required List<String> removedItems})
+    : removedItems = List.unmodifiable(removedItems);
+
+  final List<String> removedItems;
 }
 
 class KitchenOrderFilter {

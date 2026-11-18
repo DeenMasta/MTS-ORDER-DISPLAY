@@ -513,6 +513,11 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                           ),
                         ),
                         IconButton(
+                          tooltip: 'Customise ${type.name} icon',
+                          onPressed: () => _selectOrderTypeIcon(type),
+                          icon: const Icon(Icons.edit_outlined),
+                        ),
+                        IconButton(
                           tooltip: 'Remove ${type.name}',
                           onPressed: () => _removeOrderType(type),
                           icon: const Icon(Icons.delete_outline_rounded),

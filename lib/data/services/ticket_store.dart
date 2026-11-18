@@ -79,17 +79,35 @@ class TicketStore {
         where: 'id = ?',
         whereArgs: [ticket.id],
       );
-      if (existing.isNotEmpty &&
-          ticket.revision <= (existing.single['revision'] as int)) {
-        return;
+      if (existing.isNotEmpty) {
+        final storedRevision = existing.single['revision'] as int;
+        if (ticket.revision < storedRevision) return;
+        if (ticket.revision == storedRevision &&
+            _hasSameContent(
+              Map<String, dynamic>.from(
+                jsonDecode(existing.single['payload_json']! as String) as Map,
+              ),
+              ticket,
+            )) {
+          return;
+        }
       }
       final isCancellation =
           ticket.action == 'cancel' || ticket.action == 'void';
+      final payload =
+          isCancellation && ticket.items.isEmpty && existing.isNotEmpty
+          ? _cancelledPayload(
+              Map<String, dynamic>.from(
+                jsonDecode(existing.single['payload_json']! as String) as Map,
+              ),
+              ticket,
+            )
+          : ticket.toJson();
       await transaction.insert('tickets', {
         'id': ticket.id,
         'revision': ticket.revision,
         'status': isCancellation ? 'cancelling' : 'active',
-        'payload_json': jsonEncode(ticket.toJson()),
+        'payload_json': jsonEncode(payload),
         'updated_at': (isCancellation ? DateTime.now() : ticket.createdAt)
             .toUtc()
             .toIso8601String(),
@@ -101,6 +119,35 @@ class TicketStore {
       (await (await _db).database.query('order_types', orderBy: 'name ASC'))
           .map((row) => KdsOrderType.fromJson(Map<String, dynamic>.from(row)))
           .toList(growable: false);
+
+  /// Cancellation events commonly contain no line items. Keep the original
+  /// receipt contents so staff can still review what was cancelled.
+  Map<String, dynamic> _cancelledPayload(
+    Map<String, dynamic> previous,
+    KitchenTicket cancellation,
+  ) {
+    previous['message_id'] = cancellation.messageId;
+    previous['revision'] = cancellation.revision;
+    previous['action'] = cancellation.action;
+    previous['cancelled_at'] = DateTime.now().toUtc().toIso8601String();
+    return previous;
+  }
+
+  /// Accepts a same-revision update only if it contains an actual POS change.
+  /// This supports POS versions that do not advance revisions after edits.
+  bool _hasSameContent(
+    Map<String, dynamic> previous,
+    KitchenTicket incomingTicket,
+  ) {
+    final incoming = incomingTicket.toJson();
+    previous
+      ..remove('message_id')
+      ..remove('revision');
+    incoming
+      ..remove('message_id')
+      ..remove('revision');
+    return jsonEncode(previous) == jsonEncode(incoming);
+  }
 
   Future<void> updateOrderTypeIcon(String id, String icon) async {
     await (await _db).database.update(

@@ -392,6 +392,38 @@ void main() {
     expect(repository.dismissCalls, isZero);
   });
 
+  test('keeps only deleted items as a revision indicator', () async {
+    final original = _ticket(
+      '300',
+      'Dine In',
+      items: const [
+        KitchenTicketItem(name: 'Mee goreng', quantity: 3),
+        KitchenTicketItem(name: 'Teh O', quantity: 1),
+      ],
+    );
+    final repository = _FakeKitchenRepository([original]);
+    final viewModel = KitchenBoardViewModel(
+      repository: repository,
+      settingsRepository: _FakeSettingsRepository(),
+    );
+    addTearDown(viewModel.dispose);
+
+    await viewModel.start(_session);
+    repository.replaceTicket(
+      _ticket(
+        '300',
+        'Dine In',
+        items: const [KitchenTicketItem(name: 'Mee goreng', quantity: 2)],
+      ),
+    );
+    repository.notifyChanged();
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    final changes = viewModel.itemUpdatesFor(viewModel.tickets.single);
+    expect(changes?.removedItems, ['1x  Teh O']);
+  });
+
   test(
     'returns a dashboard Finished receipt without marking it retrieved',
     () async {
@@ -506,7 +538,7 @@ void main() {
     expect(viewModel.todayHistoryGroups, hasLength(1));
   });
 
-  test('archives a POS-cancelled receipt as Cancelled history', () async {
+  test('keeps a POS-cancelled receipt until staff finish it', () async {
     final cancelled = _ticket('201', 'Dine In').copyWith(
       cancelledAt: DateTime.now().subtract(const Duration(seconds: 2)),
       isCancelled: true,
@@ -521,6 +553,12 @@ void main() {
 
     await viewModel.start(_session);
     await Future<void>.delayed(Duration.zero);
+
+    expect(viewModel.ticketGroups, hasLength(1));
+    expect(viewModel.todayHistoryGroups, isEmpty);
+
+    await viewModel.completeReceipt(viewModel.ticketGroups.single);
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
 
     expect(viewModel.ticketGroups, isEmpty);
     expect(viewModel.todayHistoryGroups, hasLength(1));
@@ -550,19 +588,24 @@ const _session = DisplaySession(
   displayName: 'Kitchen',
 );
 
-KitchenTicket _ticket(String orderNumber, String type, {String? orderTypeId}) =>
-    KitchenTicket(
-      messageId: 'message-$orderNumber',
-      saleId: 'sale-$orderNumber',
-      departmentId: 'kitchen',
-      revision: 1,
-      action: 'upsert',
-      orderNumber: orderNumber,
-      createdAt: DateTime(2026),
-      items: const [],
-      orderTypeId: orderTypeId,
-      orderTypeName: type,
-    );
+KitchenTicket _ticket(
+  String orderNumber,
+  String type, {
+  String? orderTypeId,
+  int revision = 1,
+  List<KitchenTicketItem> items = const [],
+}) => KitchenTicket(
+  messageId: 'message-$orderNumber',
+  saleId: 'sale-$orderNumber',
+  departmentId: 'kitchen',
+  revision: revision,
+  action: 'upsert',
+  orderNumber: orderNumber,
+  createdAt: DateTime(2026),
+  items: items,
+  orderTypeId: orderTypeId,
+  orderTypeName: type,
+);
 
 class _FakeKitchenRepository implements KitchenRepository {
   _FakeKitchenRepository(
@@ -588,6 +631,11 @@ class _FakeKitchenRepository implements KitchenRepository {
   int historyCalls = 0;
 
   void addTicket(KitchenTicket ticket) => _tickets.add(ticket);
+
+  void replaceTicket(KitchenTicket ticket) {
+    _tickets.removeWhere((existing) => existing.id == ticket.id);
+    _tickets.add(ticket);
+  }
 
   void notifyChanged() => _changes.add(null);
 

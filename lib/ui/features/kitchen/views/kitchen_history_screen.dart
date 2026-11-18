@@ -229,7 +229,8 @@ class _HistoryReceipt extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                const Icon(Icons.restore_rounded, color: AppColors.mutedText),
+                if (!cancelled)
+                  const Icon(Icons.restore_rounded, color: AppColors.mutedText),
               ],
             ),
             const SizedBox(height: 6),

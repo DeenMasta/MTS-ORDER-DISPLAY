@@ -65,6 +65,27 @@ void main() {
     expect(connection.receipts, hasLength(2));
   });
 
+  test('accepts changed items from a same-revision POS update', () async {
+    final pairing = FakePairingRepository(isPaired: true);
+    final connection = FakePosConnection();
+    final store = FakeTicketStore();
+    final repository = _repository(connection, pairing, store);
+    await repository.start(session);
+
+    connection.receive(order());
+    connection.receive(
+      order(
+        messageId: 'message-2',
+        items: const [
+          {'name': 'Chicken Rice', 'quantity': 1},
+        ],
+      ),
+    );
+    await _settle();
+
+    expect(store.active.single.items.single.quantity, 1);
+  });
+
   test('keeps a cancellation notice until the board archives it', () async {
     final pairing = FakePairingRepository(isPaired: true);
     final connection = FakePosConnection();
@@ -139,6 +160,7 @@ Map<String, dynamic> order({
   String messageId = 'message-1',
   int revision = 1,
   String action = 'upsert',
+  List<Map<String, dynamic>>? items,
 }) => {
   'type': 'kitchen_order',
   'protocol': 'kitchen-order.v1',
@@ -149,9 +171,11 @@ Map<String, dynamic> order({
   'action': action,
   'order_number': 104,
   'created_at': '2026-10-29T10:30:00+08:00',
-  'items': [
-    {'name': 'Chicken Rice', 'quantity': 2},
-  ],
+  'items':
+      items ??
+      [
+        {'name': 'Chicken Rice', 'quantity': 2},
+      ],
 };
 
 Future<void> _settle() async {
@@ -257,7 +281,7 @@ class FakeTicketStore extends TicketStore {
     if (failWrites) throw const FormatException('Unable to save order.');
     if (!_processed.add(ticket.messageId)) return;
     final existing = _cards[ticket.id];
-    if (existing != null && ticket.revision <= existing.revision) return;
+    if (existing != null && ticket.revision < existing.revision) return;
     if (ticket.action == 'cancel' || ticket.action == 'void') {
       _cards[ticket.id] = ticket.copyWith(
         cancelledAt: DateTime.now(),

@@ -17,6 +17,7 @@ import 'slanted_timer_clipper.dart';
 const _boardBackground = AppColors.canvas;
 const _boardForeground = AppColors.text;
 const _boardMuted = AppColors.mutedText;
+const _urgentTimerColor = Color(0xFFFF1C2C);
 
 class KitchenBoardScreen extends StatefulWidget {
   const KitchenBoardScreen({
@@ -106,6 +107,7 @@ class _KitchenBoardScreenState extends State<KitchenBoardScreen> {
                   Center(
                     child: _ReconnectDialog(
                       pairingCode: widget.viewModel.pairingCode,
+                      onChangeConnection: widget.onChangeConnection,
                     ),
                   ),
                 ],
@@ -203,12 +205,13 @@ class _KitchenBoardBody extends StatelessWidget {
                         isRetrieved: viewModel.isRetrieved,
                         isCancelled: viewModel.isCancelled,
                         isCrossed: viewModel.isItemCrossed,
+                        itemUpdatesFor: viewModel.itemUpdatesFor,
                         onToggle: viewModel.toggleItemCrossed,
                         completionSecondsRemaining:
                             viewModel.completionSecondsRemaining,
                         cancellationSecondsRemaining:
                             viewModel.cancellationSecondsRemaining,
-                        onComplete: viewModel.completeLocally,
+                        onComplete: viewModel.completeReceipt,
                         onUndoComplete: viewModel.undoLocalCompletion,
                       ),
               ),
@@ -223,9 +226,10 @@ class _KitchenBoardBody extends StatelessWidget {
 }
 
 class _ReconnectDialog extends StatelessWidget {
-  const _ReconnectDialog({this.pairingCode});
+  const _ReconnectDialog({this.pairingCode, required this.onChangeConnection});
 
   final String? pairingCode;
+  final Future<void> Function() onChangeConnection;
 
   @override
   Widget build(BuildContext context) => ConstrainedBox(
@@ -295,6 +299,12 @@ class _ReconnectDialog extends StatelessWidget {
                 ),
               ),
             ],
+            const SizedBox(height: 18),
+            OutlinedButton.icon(
+              onPressed: onChangeConnection,
+              icon: const Icon(Icons.sync_alt_rounded, size: 18),
+              label: const Text('Change POS connection'),
+            ),
           ],
         ),
       ),
@@ -551,6 +561,7 @@ class _TicketPager extends StatefulWidget {
     required this.isRetrieved,
     required this.isCancelled,
     required this.isCrossed,
+    required this.itemUpdatesFor,
     required this.onToggle,
     required this.completionSecondsRemaining,
     required this.cancellationSecondsRemaining,
@@ -566,6 +577,7 @@ class _TicketPager extends StatefulWidget {
   final bool Function(List<KitchenTicket>) isRetrieved;
   final bool Function(List<KitchenTicket>) isCancelled;
   final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
+  final TicketItemUpdates? Function(KitchenTicket) itemUpdatesFor;
   final void Function(KitchenTicket ticket, int itemIndex) onToggle;
   final int Function(List<KitchenTicket>) completionSecondsRemaining;
   final int Function(List<KitchenTicket>) cancellationSecondsRemaining;
@@ -640,6 +652,7 @@ class _TicketPagerState extends State<_TicketPager> {
         isRetrieved: widget.isRetrieved,
         isCancelled: widget.isCancelled,
         isCrossed: widget.isCrossed,
+        itemUpdatesFor: widget.itemUpdatesFor,
         onToggle: widget.onToggle,
         completionSecondsRemaining: widget.completionSecondsRemaining,
         cancellationSecondsRemaining: widget.cancellationSecondsRemaining,
@@ -659,6 +672,7 @@ class _TicketGrid extends StatelessWidget {
     required this.isRetrieved,
     required this.isCancelled,
     required this.isCrossed,
+    required this.itemUpdatesFor,
     required this.onToggle,
     required this.completionSecondsRemaining,
     required this.cancellationSecondsRemaining,
@@ -672,6 +686,7 @@ class _TicketGrid extends StatelessWidget {
   final bool Function(List<KitchenTicket>) isRetrieved;
   final bool Function(List<KitchenTicket>) isCancelled;
   final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
+  final TicketItemUpdates? Function(KitchenTicket) itemUpdatesFor;
   final void Function(KitchenTicket ticket, int itemIndex) onToggle;
   final int Function(List<KitchenTicket>) completionSecondsRemaining;
   final int Function(List<KitchenTicket>) cancellationSecondsRemaining;
@@ -711,6 +726,7 @@ class _TicketGrid extends StatelessWidget {
           isRetrieved: isRetrieved(groups[index]),
           isCancelled: isCancelled(groups[index]),
           isCrossed: isCrossed,
+          itemUpdatesFor: itemUpdatesFor,
           onToggle: onToggle,
           secondsRemaining: () => completionSecondsRemaining(groups[index]),
           cancellationSecondsRemaining: () =>
@@ -732,6 +748,7 @@ class _TicketCard extends StatelessWidget {
     required this.isRetrieved,
     required this.isCancelled,
     required this.isCrossed,
+    required this.itemUpdatesFor,
     required this.onToggle,
     required this.secondsRemaining,
     required this.cancellationSecondsRemaining,
@@ -745,6 +762,7 @@ class _TicketCard extends StatelessWidget {
   final bool isRetrieved;
   final bool isCancelled;
   final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
+  final TicketItemUpdates? Function(KitchenTicket) itemUpdatesFor;
   final void Function(KitchenTicket ticket, int itemIndex) onToggle;
   final int Function() secondsRemaining;
   final int Function() cancellationSecondsRemaining;
@@ -757,163 +775,161 @@ class _TicketCard extends StatelessWidget {
     final orderFor = ticket.orderFor;
     final remainingSeconds = secondsRemaining();
     final cancelledRemainingSeconds = cancellationSecondsRemaining();
-    final elapsed = DateTime.now().difference(ticket.createdAt.toLocal());
-    final accent = elapsed.inSeconds >= settings.urgentThresholdSeconds
-        ? const Color(0xFFFF1C2C)
-        : elapsed.inSeconds >= settings.warningThresholdSeconds
-        ? const Color(0xFFFFEF00)
-        : const Color(0xFF02D53C);
+    final finalizingCancellation = isCancelled && cancelledRemainingSeconds > 0;
+    final headerSecondsRemaining = finalizingCancellation
+        ? cancelledRemainingSeconds
+        : remainingSeconds;
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       color: Colors.white,
       child: Column(
         children: [
-          SizedBox(
-            height: 52,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                const ColoredBox(color: Colors.black),
-                if (isCancelled)
-                  const ColoredBox(color: Color(0xFFB42339))
-                else ...[
-                  ClipPath(
-                    clipper: const SlantedTimerClipper(),
-                    child: ColoredBox(color: accent),
-                  ),
-                  if (remainingSeconds > 0)
-                    const ColoredBox(color: Color(0xFF007C58)),
-                ],
-                Semantics(
-                  button: !isCancelled && remainingSeconds == 0,
-                  label: isCancelled
-                      ? cancelledRemainingSeconds > 0
-                            ? 'Cancelled. Moving to order history in '
-                                  '$cancelledRemainingSeconds seconds.'
-                            : 'Cancelled. Moving to order history.'
-                      : remainingSeconds > 0
-                      ? 'Finished. Removing in $remainingSeconds seconds.'
-                      : 'Tap receipt header to mark this order finished.',
-                  child: InkWell(
-                    onTap: !isCancelled && remainingSeconds == 0
-                        ? () {
-                            onComplete();
-                          }
-                        : null,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      child: isCancelled
-                          ? Row(
-                              children: [
-                                const Expanded(
-                                  child: Text(
-                                    'CANCELLED',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                ),
-                                if (cancelledRemainingSeconds > 0)
-                                  ValueListenableBuilder<int>(
-                                    valueListenable: clockTicks,
-                                    builder: (context, _, _) => Text(
-                                      '00:${cancellationSecondsRemaining().toString().padLeft(2, '0')}',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 1,
+          ValueListenableBuilder<int>(
+            valueListenable: clockTicks,
+            builder: (context, _, _) {
+              final elapsed = DateTime.now().difference(
+                ticket.createdAt.toLocal(),
+              );
+              final accent =
+                  elapsed.inSeconds >= settings.urgentThresholdSeconds
+                  ? _urgentTimerColor
+                  : elapsed.inSeconds >= settings.warningThresholdSeconds
+                  ? const Color(0xFFFFEF00)
+                  : const Color(0xFF02D53C);
+              return SizedBox(
+                height: 52,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    const ColoredBox(color: Colors.black),
+                    if (isCancelled && !finalizingCancellation)
+                      const ColoredBox(color: Color(0xFFB42339))
+                    else ...[
+                      ClipPath(
+                        clipper: const SlantedTimerClipper(),
+                        child: ColoredBox(color: accent),
+                      ),
+                      if (headerSecondsRemaining > 0)
+                        const ColoredBox(color: Color(0xFF007C58)),
+                    ],
+                    Semantics(
+                      button: headerSecondsRemaining == 0,
+                      label: isCancelled && !finalizingCancellation
+                          ? 'Cancelled. Tap receipt header to finish it.'
+                          : headerSecondsRemaining > 0
+                          ? 'Finished. Removing in $headerSecondsRemaining seconds.'
+                          : 'Tap receipt header to mark this order finished.',
+                      child: InkWell(
+                        onTap: headerSecondsRemaining == 0
+                            ? () {
+                                onComplete();
+                              }
+                            : null,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          child: isCancelled && !finalizingCancellation
+                              ? Row(
+                                  children: [
+                                    const Expanded(
+                                      child: Text(
+                                        'CANCELLED',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 1,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                              ],
-                            )
-                          : remainingSeconds > 0
-                          ? Row(
-                              children: [
-                                const Expanded(
-                                  child: Text(
-                                    'FINISHED',
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                ),
-                                ValueListenableBuilder<int>(
-                                  valueListenable: clockTicks,
-                                  builder: (context, _, _) => Text(
-                                    '00:${secondsRemaining().toString().padLeft(2, '0')}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: 1,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 2),
-                                Semantics(
-                                  button: true,
-                                  label: 'Undo finished receipt',
-                                  child: Tooltip(
-                                    message: 'Undo finished receipt',
-                                    child: IconButton(
-                                      visualDensity: VisualDensity.compact,
-                                      onPressed: () {
-                                        onUndoComplete();
-                                      },
-                                      icon: const Icon(
-                                        Icons.undo_rounded,
-                                        color: Colors.white,
+                                  ],
+                                )
+                              : headerSecondsRemaining > 0
+                              ? Row(
+                                  children: [
+                                    const Expanded(
+                                      child: Text(
+                                        'FINISHED',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 1,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                ),
-                              ],
-                            )
-                          : Row(
-                              children: [
-                                Text(
-                                  '#${ticket.orderNumber}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                                const Spacer(),
-                                ValueListenableBuilder<int>(
-                                  valueListenable: clockTicks,
-                                  builder: (context, _, _) {
-                                    final currentElapsed = DateTime.now()
-                                        .difference(ticket.createdAt.toLocal());
-                                    return Text(
-                                      _formatDuration(currentElapsed),
+                                    ValueListenableBuilder<int>(
+                                      valueListenable: clockTicks,
+                                      builder: (context, _, _) => Text(
+                                        '00:${(isCancelled ? cancellationSecondsRemaining() : secondsRemaining()).toString().padLeft(2, '0')}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: 1,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 2),
+                                    Semantics(
+                                      button: true,
+                                      label: 'Undo finished receipt',
+                                      child: Tooltip(
+                                        message: 'Undo finished receipt',
+                                        child: IconButton(
+                                          visualDensity: VisualDensity.compact,
+                                          onPressed: () {
+                                            onUndoComplete();
+                                          },
+                                          icon: const Icon(
+                                            Icons.undo_rounded,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Row(
+                                  children: [
+                                    Text(
+                                      '#${ticket.orderNumber}',
                                       style: const TextStyle(
-                                        color: Colors.black,
+                                        color: Colors.white,
                                         fontSize: 20,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 1.2,
+                                        fontWeight: FontWeight.w800,
                                       ),
-                                    );
-                                  },
+                                    ),
+                                    const Spacer(),
+                                    ValueListenableBuilder<int>(
+                                      valueListenable: clockTicks,
+                                      builder: (context, _, _) {
+                                        final currentElapsed = DateTime.now()
+                                            .difference(
+                                              ticket.createdAt.toLocal(),
+                                            );
+                                        return Text(
+                                          _formatDuration(currentElapsed),
+                                          style: const TextStyle(
+                                            color: Colors.black,
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.w900,
+                                            letterSpacing: 1.2,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
           Expanded(
             child: SingleChildScrollView(
@@ -1024,8 +1040,10 @@ class _TicketCard extends StatelessWidget {
                     tickets: tickets,
                     largeText: settings.largeText,
                     isCrossed: isCrossed,
+                    updatesFor: itemUpdatesFor,
                     onToggle: onToggle,
                     enabled: !isCancelled && remainingSeconds == 0,
+                    isCancelled: isCancelled,
                   ),
                 ],
               ),
@@ -1056,75 +1074,169 @@ class _Items extends StatelessWidget {
     required this.tickets,
     required this.largeText,
     required this.isCrossed,
+    required this.updatesFor,
     required this.onToggle,
     required this.enabled,
+    required this.isCancelled,
   });
   final List<KitchenTicket> tickets;
   final bool largeText;
   final bool Function(KitchenTicket ticket, int itemIndex) isCrossed;
+  final TicketItemUpdates? Function(KitchenTicket) updatesFor;
   final void Function(KitchenTicket ticket, int itemIndex) onToggle;
   final bool enabled;
+  final bool isCancelled;
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      for (final ticket in tickets)
-        for (
-          var itemIndex = 0;
-          itemIndex < ticket.items.length;
-          itemIndex++
-        ) ...[
-          Builder(
-            builder: (context) {
-              final item = ticket.items[itemIndex];
-              final crossed = isCrossed(ticket, itemIndex);
-              return Semantics(
-                button: enabled,
-                label: !enabled
-                    ? '${item.name}, cancelled.'
-                    : crossed
-                    ? '${item.name}, completed. Tap to restore.'
-                    : '${item.name}. Tap to cross out.',
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(4),
-                  onTap: enabled ? () => onToggle(ticket, itemIndex) : null,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Text(
-                      '${item.displayQuantity}x  ${item.name}',
-                      style: TextStyle(
-                        fontSize: largeText ? 20 : 15,
-                        fontWeight: FontWeight.w800,
-                        color: crossed ? Colors.black45 : null,
-                        decoration: crossed ? TextDecoration.lineThrough : null,
-                        decorationThickness: crossed ? 2.5 : null,
+  Widget build(BuildContext context) {
+    final detailStyle = isCancelled
+        ? _detailStyle.copyWith(
+            color: _urgentTimerColor,
+            decoration: TextDecoration.lineThrough,
+            decorationThickness: 1.5,
+          )
+        : _detailStyle;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final ticket in tickets)
+          for (
+            var itemIndex = 0;
+            itemIndex < ticket.items.length;
+            itemIndex++
+          ) ...[
+            Builder(
+              builder: (context) {
+                final item = ticket.items[itemIndex];
+                final crossed = isCrossed(ticket, itemIndex);
+                final itemText = '${item.displayQuantity}x  ${item.name}';
+                final itemStyle = TextStyle(
+                  fontSize: largeText ? 20 : 15,
+                  fontWeight: FontWeight.w800,
+                  color: isCancelled
+                      ? _urgentTimerColor
+                      : crossed
+                      ? Colors.black45
+                      : null,
+                  decoration: crossed ? TextDecoration.lineThrough : null,
+                  decorationThickness: crossed ? 2.5 : null,
+                );
+                // The checklist is visual-only, so an item's supporting
+                // details must reflect its local crossed state too. This is
+                // deliberately kept in the view and never reaches the POS.
+                final itemDetailStyle = crossed
+                    ? detailStyle.copyWith(
+                        color: Colors.black45,
+                        decoration: TextDecoration.lineThrough,
+                        decorationThickness: 1.5,
+                      )
+                    : detailStyle;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Semantics(
+                      button: enabled,
+                      label: !enabled
+                          ? '${item.name}, cancelled.'
+                          : crossed
+                          ? '${item.name}, completed. Tap to restore.'
+                          : '${item.name}. Tap to cross out.',
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(4),
+                        onTap: enabled
+                            ? () => onToggle(ticket, itemIndex)
+                            : null,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: isCancelled
+                              ? Text.rich(
+                                  TextSpan(
+                                    children: [
+                                      TextSpan(
+                                        text: itemText,
+                                        style: const TextStyle(
+                                          decoration:
+                                              TextDecoration.lineThrough,
+                                          decorationThickness: 2.5,
+                                        ),
+                                      ),
+                                      const TextSpan(text: ' (CANCELLED)'),
+                                    ],
+                                  ),
+                                  style: itemStyle,
+                                )
+                              : Text(itemText, style: itemStyle),
+                        ),
                       ),
                     ),
+                    if (item.variant case final variant?
+                        when variant.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 45, top: 3),
+                        child: Text(variant, style: itemDetailStyle),
+                      ),
+                    for (final modifier in item.modifiers)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 45, top: 3),
+                        child: Text('- $modifier', style: itemDetailStyle),
+                      ),
+                    if (item.comments case final comments?
+                        when comments.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 45, top: 3),
+                        child: Text('Notes: $comments', style: itemDetailStyle),
+                      ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 5),
+          ],
+        for (final ticket in tickets)
+          if (updatesFor(ticket)?.removedItems case final removedItems?
+              when removedItems.isNotEmpty)
+            _RemovedItems(items: removedItems, largeText: largeText),
+      ],
+    );
+  }
+}
+
+class _RemovedItems extends StatelessWidget {
+  const _RemovedItems({required this.items, required this.largeText});
+
+  final List<String> items;
+  final bool largeText;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 2),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final item in items)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: item,
+                    style: const TextStyle(
+                      decoration: TextDecoration.lineThrough,
+                      decorationThickness: 1.5,
+                    ),
                   ),
-                ),
-              );
-            },
+                  const TextSpan(text: ' (CANCELLED)'),
+                ],
+              ),
+              style: TextStyle(
+                color: _urgentTimerColor,
+                fontSize: largeText ? 20 : 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ),
-          if (ticket.items[itemIndex].variant case final variant?
-              when variant.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(left: 45, top: 3),
-              child: Text(variant, style: _detailStyle),
-            ),
-          for (final modifier in ticket.items[itemIndex].modifiers)
-            Padding(
-              padding: const EdgeInsets.only(left: 45, top: 3),
-              child: Text('- $modifier', style: _detailStyle),
-            ),
-          if (ticket.items[itemIndex].comments case final comments?
-              when comments.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(left: 45, top: 3),
-              child: Text('Notes: $comments', style: _detailStyle),
-            ),
-          const SizedBox(height: 5),
-        ],
-    ],
+      ],
+    ),
   );
 }
 
