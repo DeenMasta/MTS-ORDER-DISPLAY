@@ -697,7 +697,7 @@ class _KitchenSettingsScreenState extends State<KitchenSettingsScreen> {
                 alignment: Alignment.centerLeft,
                 child: OutlinedButton.icon(
                   onPressed: () async {
-                    await widget.viewModel.start(widget.session);
+                    await widget.viewModel.refreshConnection(widget.session);
                     if (mounted) _message('Reconnect requested.');
                   },
                   icon: const Icon(Icons.refresh),

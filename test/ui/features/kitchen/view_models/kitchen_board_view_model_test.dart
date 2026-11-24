@@ -79,6 +79,23 @@ void main() {
     expect(viewModel.isPaired, isFalse);
   });
 
+  test(
+    'refreshes the saved POS session without changing its identity',
+    () async {
+      final repository = _FakeKitchenRepository(const []);
+      final viewModel = KitchenBoardViewModel(
+        repository: repository,
+        settingsRepository: _FakeSettingsRepository(),
+      );
+      addTearDown(viewModel.dispose);
+
+      await viewModel.start(_session);
+      await viewModel.refreshConnection(_session);
+
+      expect(repository.startCalls, 2);
+    },
+  );
+
   test('shows every active order type as a dashboard filter', () async {
     final viewModel = KitchenBoardViewModel(
       repository: _FakeKitchenRepository([
@@ -558,7 +575,9 @@ void main() {
     expect(viewModel.todayHistoryGroups, isEmpty);
 
     await viewModel.completeReceipt(viewModel.ticketGroups.single);
-    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    // The cancellation cleanup runs on a one-second clock tick. Wait through
+    // the following full tick so this test is not dependent on scheduling.
+    await Future<void>.delayed(const Duration(milliseconds: 2200));
 
     expect(viewModel.ticketGroups, isEmpty);
     expect(viewModel.todayHistoryGroups, hasLength(1));
@@ -629,6 +648,7 @@ class _FakeKitchenRepository implements KitchenRepository {
   int restoreCalls = 0;
   final List<bool> restoreIndicators = <bool>[];
   int historyCalls = 0;
+  int startCalls = 0;
 
   void addTicket(KitchenTicket ticket) => _tickets.add(ticket);
 
@@ -701,9 +721,12 @@ class _FakeKitchenRepository implements KitchenRepository {
   Future<List<KdsOrderType>> orderTypes() async => _configuredOrderTypes;
 
   @override
-  Future<List<KitchenTicket>> start(DisplaySession session) async => _tickets
-      .where((ticket) => !_finishedTicketIds.contains(ticket.id))
-      .toList(growable: false);
+  Future<List<KitchenTicket>> start(DisplaySession session) async {
+    startCalls++;
+    return _tickets
+        .where((ticket) => !_finishedTicketIds.contains(ticket.id))
+        .toList(growable: false);
+  }
 
   @override
   Future<void> updateOrderTypeIcon(String id, String icon) async {}

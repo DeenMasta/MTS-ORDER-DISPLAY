@@ -315,6 +315,11 @@ class KitchenBoardViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Retries the existing display session without clearing its saved POS
+  /// address or pairing identity. The pairing repository re-sends its resume
+  /// request when the socket connects again.
+  Future<void> refreshConnection(DisplaySession session) => _reload(session);
+
   void selectFilter(KitchenOrderFilter filter) {
     if (!availableFilters.contains(filter)) return;
     if (_filter == filter) return;

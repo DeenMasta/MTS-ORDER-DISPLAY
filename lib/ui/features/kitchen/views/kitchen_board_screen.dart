@@ -107,6 +107,8 @@ class _KitchenBoardScreenState extends State<KitchenBoardScreen> {
                   Center(
                     child: _ReconnectDialog(
                       pairingCode: widget.viewModel.pairingCode,
+                      onRefreshConnection: () =>
+                          widget.viewModel.refreshConnection(widget.session),
                       onChangeConnection: widget.onChangeConnection,
                     ),
                   ),
@@ -226,9 +228,14 @@ class _KitchenBoardBody extends StatelessWidget {
 }
 
 class _ReconnectDialog extends StatelessWidget {
-  const _ReconnectDialog({this.pairingCode, required this.onChangeConnection});
+  const _ReconnectDialog({
+    this.pairingCode,
+    required this.onRefreshConnection,
+    required this.onChangeConnection,
+  });
 
   final String? pairingCode;
+  final Future<void> Function() onRefreshConnection;
   final Future<void> Function() onChangeConnection;
 
   @override
@@ -300,6 +307,12 @@ class _ReconnectDialog extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: () => onRefreshConnection(),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Refresh connection'),
+            ),
+            const SizedBox(height: 8),
             OutlinedButton.icon(
               onPressed: onChangeConnection,
               icon: const Icon(Icons.sync_alt_rounded, size: 18),
